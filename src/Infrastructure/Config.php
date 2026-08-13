@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ProjectSync\Infrastructure;
 
 use InvalidArgumentException;
+use ProjectSync\Exceptions\ConfigurationException;
 
 final readonly class Config
 {
@@ -31,6 +32,37 @@ final readonly class Config
         }
 
         return $value;
+    }
+
+    public function requiredString(string $key): string
+    {
+        $value = trim($this->string($key));
+        if ($value === '') {
+            throw new ConfigurationException(sprintf('Configuration value "%s" is required.', $key));
+        }
+
+        return $value;
+    }
+
+    /** @param list<string> $allowedValues */
+    public function allowedString(string $key, array $allowedValues): string
+    {
+        $value = $this->requiredString($key);
+        if (!in_array($value, $allowedValues, true)) {
+            throw new ConfigurationException(sprintf('Configuration value "%s" is invalid.', $key));
+        }
+
+        return $value;
+    }
+
+    public function port(string $key): int
+    {
+        $value = $this->requiredString($key);
+        if (!ctype_digit($value) || (int) $value < 1 || (int) $value > 65535) {
+            throw new ConfigurationException(sprintf('Configuration value "%s" must be a valid TCP port.', $key));
+        }
+
+        return (int) $value;
     }
 
     /** @return list<string> */

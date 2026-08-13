@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ProjectSync\Infrastructure;
 
 use PDO;
+use ProjectSync\Exceptions\MigrationException;
 use RuntimeException;
 
 final readonly class MigrationRunner
@@ -39,21 +40,31 @@ final readonly class MigrationRunner
                 throw new RuntimeException(sprintf('Migration "%s" must return a callable.', $migration));
             }
 
-            $this->connection->beginTransaction();
+            $usesTransactions = $this->usesTransactionalDdl();
+            if ($usesTransactions) {
+                $this->connection->beginTransaction();
+            }
             try {
                 $callback($this->connection);
                 $statement = $this->connection->prepare('INSERT INTO schema_migrations (migration, batch) VALUES (:migration, :batch)');
                 $statement->execute(['migration' => $migration, 'batch' => $batch]);
-                $this->connection->commit();
+                if ($usesTransactions) {
+                    $this->connection->commit();
+                }
             } catch (\Throwable $exception) {
-                if ($this->connection->inTransaction()) {
+                if ($usesTransactions && $this->connection->inTransaction()) {
                     $this->connection->rollBack();
                 }
-                throw $exception;
+                throw MigrationException::failed($migration, $exception);
             }
             $executed[] = $migration;
         }
 
         return $executed;
+    }
+
+    private function usesTransactionalDdl(): bool
+    {
+        return $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql';
     }
 }

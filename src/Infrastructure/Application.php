@@ -31,6 +31,10 @@ final readonly class Application
     public function handle(array $server): HttpResponse
     {
         $requestId = '';
+        $method = 'GET';
+        $uri = '/';
+        $startedAt = hrtime(true);
+        $response = null;
         try {
             $methodValue = $server['REQUEST_METHOD'] ?? 'GET';
             $uriValue = $server['REQUEST_URI'] ?? '/';
@@ -46,7 +50,9 @@ final readonly class Application
                 if ($middleware instanceof CorsMiddleware) {
                     $preflight = $middleware->preflight($method, $origin, $requestId);
                     if ($preflight !== null) {
-                        return $preflight;
+                        $response = $preflight;
+
+                        return $response;
                     }
                 }
             }
@@ -63,11 +69,19 @@ final readonly class Application
                 $response = $handler($requestId);
             }
 
-            return $this->withCors($response, $origin);
+            $response = $this->withCors($response, $origin);
+
+            return $response;
         } catch (Throwable $exception) {
             $requestId = $requestId !== '' ? $requestId : bin2hex(random_bytes(12));
             $this->logger->error('Unhandled API exception.', ['request_id' => $requestId, 'exception' => $exception]);
-            return JsonResponse::error('INTERNAL_ERROR', 'An unexpected error occurred.', $requestId, 500);
+            $response = JsonResponse::error('INTERNAL_ERROR', 'An unexpected error occurred.', $requestId, 500);
+
+            return $response;
+        } finally {
+            if ($response instanceof HttpResponse) {
+                $this->logCompletion($requestId, $method, $uri, $response, $startedAt);
+            }
         }
     }
 
@@ -81,5 +95,24 @@ final readonly class Application
         $headers['Access-Control-Allow-Origin'] = $origin;
         $headers['Vary'] = 'Origin';
         return new HttpResponse($response->status, $headers, $response->body);
+    }
+
+    private function logCompletion(string $requestId, string $method, string $uri, HttpResponse $response, int $startedAt): void
+    {
+        $error = $response->body['error'] ?? null;
+        $errorCode = is_array($error) ? ($error['code'] ?? null) : null;
+        try {
+            $this->logger->info('API request completed.', [
+                'request_id' => $requestId,
+                'environment' => $this->config->string('app.environment'),
+                'route' => $uri,
+                'method' => $method,
+                'status_code' => $response->status,
+                'error_code' => is_string($errorCode) ? $errorCode : null,
+                'duration_ms' => (hrtime(true) - $startedAt) / 1_000_000,
+            ]);
+        } catch (Throwable) {
+            // Logging failures must not change an API response.
+        }
     }
 }

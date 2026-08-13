@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use ProjectSync\Exceptions\ConfigurationException;
+use ProjectSync\Infrastructure\Config;
+use ProjectSync\Infrastructure\DatabaseConnection;
 
 final class DatabaseConfigTest extends TestCase
 {
@@ -29,5 +32,21 @@ final class DatabaseConfigTest extends TestCase
         self::assertSame('sync_test', $database['database']);
         self::assertSame('sync_user', $database['username']);
         self::assertSame('secret', $database['password']);
+    }
+
+    public function testItRejectsMissingDatabaseNameBeforeConnecting(): void
+    {
+        $connection = new DatabaseConnection(new Config([
+            'db.host' => '127.0.0.1',
+            'db.port' => '3306',
+            'db.database' => '',
+            'db.username' => 'project_sync',
+            'db.password' => '',
+        ]));
+
+        $this->expectException(ConfigurationException::class);
+        $this->expectExceptionMessage('Configuration value "db.database" is required.');
+
+        $connection->validate();
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace ProjectSync\Infrastructure;
 
-use Monolog\Logger;
 use ProjectSync\Controllers\HealthController;
 use ProjectSync\Middleware\CorsMiddleware;
 use ProjectSync\Middleware\RequestIdMiddleware;
@@ -19,6 +18,7 @@ final class AppFactory
         $config = new Config([
             'app.environment' => $app['environment'],
             'app.debug' => $app['debug'],
+            'app.log_level' => $app['log_level'],
             'cors.allowed_origins' => $cors['allowed_origins'],
             'db.host' => $database['host'],
             'db.port' => (string) $database['port'],
@@ -26,6 +26,9 @@ final class AppFactory
             'db.username' => $database['username'],
             'db.password' => $database['password'],
         ]);
+        $config->allowedString('app.environment', ['local', 'testing', 'staging', 'production']);
+        LoggerFactory::assertValidLevel($config->requiredString('app.log_level'));
+        (new DatabaseConnection($config))->validate();
         $logger = LoggerFactory::create($root . '/storage/logs/application.log', $app['log_level']);
         $routes = require $root . '/routes/api.php';
 
