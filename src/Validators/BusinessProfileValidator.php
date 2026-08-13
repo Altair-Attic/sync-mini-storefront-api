@@ -1,0 +1,134 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ProjectSync\Validators;
+
+use ProjectSync\Exceptions\ValidationException;
+
+final class BusinessProfileValidator
+{
+    /** @var list<string> */
+    private const array EDITABLE_FIELDS = [
+        'business_name',
+        'whatsapp_number',
+        'support_email',
+        'logo_url',
+        'template_id',
+        'currency',
+        'timezone',
+    ];
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array{business_name: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string}
+     */
+    public function validate(array $input): array
+    {
+        $errors = [];
+        foreach ($input as $field => $_) {
+            if (!in_array($field, self::EDITABLE_FIELDS, true)) {
+                $errors[$field] = ['Unknown or forbidden field.'];
+            }
+        }
+        foreach (self::EDITABLE_FIELDS as $field) {
+            if (!array_key_exists($field, $input)) {
+                $errors[$field] = ['This field is required.'];
+            }
+        }
+
+        $businessName = $this->string($input, 'business_name');
+        if ($businessName === null || mb_strlen($businessName) < 2 || mb_strlen($businessName) > 120) {
+            $errors['business_name'] = ['Use between 2 and 120 characters.'];
+        }
+
+        $whatsappNumber = $this->phoneNumber($input['whatsapp_number'] ?? null);
+        if ($whatsappNumber === null) {
+            $errors['whatsapp_number'] = ['Enter a valid Nigerian or international phone number.'];
+        }
+
+        $supportEmail = $this->nullableString($input, 'support_email');
+        if ($supportEmail !== null && (strlen($supportEmail) > 254 || filter_var($supportEmail, FILTER_VALIDATE_EMAIL) === false)) {
+            $errors['support_email'] = ['Enter a valid email address.'];
+        }
+
+        $logoUrl = $this->nullableString($input, 'logo_url');
+        if ($logoUrl !== null && !$this->validHttpsUrl($logoUrl)) {
+            $errors['logo_url'] = ['Enter a valid HTTPS URL.'];
+        }
+
+        $templateId = $this->string($input, 'template_id');
+        if ($templateId === null || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', strtolower($templateId)) !== 1) {
+            $errors['template_id'] = ['Enter a valid template identifier.'];
+        }
+
+        $currency = $this->string($input, 'currency');
+        if ($currency === null || strtoupper($currency) !== 'NGN') {
+            $errors['currency'] = ['Unsupported currency.'];
+        }
+
+        $timezone = $this->string($input, 'timezone');
+        if ($timezone === null || !in_array($timezone, timezone_identifiers_list(), true)) {
+            $errors['timezone'] = ['Enter a valid timezone.'];
+        }
+
+        if ($errors !== []) {
+            throw new ValidationException($errors);
+        }
+        return [
+            'business_name' => $businessName,
+            'whatsapp_number' => $whatsappNumber,
+            'support_email' => $supportEmail === null ? null : strtolower($supportEmail),
+            'logo_url' => $logoUrl,
+            'template_id' => strtolower($templateId),
+            'currency' => strtoupper($currency),
+            'timezone' => $timezone,
+        ];
+    }
+
+    /** @param array<string, mixed> $input */
+    private function string(array $input, string $field): ?string
+    {
+        $value = $input[$field] ?? null;
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    /** @param array<string, mixed> $input */
+    private function nullableString(array $input, string $field): ?string
+    {
+        $value = $input[$field] ?? null;
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+
+        return is_string($value) ? trim($value) : '__invalid__';
+    }
+
+    private function phoneNumber(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        $normalized = preg_replace('/[\s()-]+/', '', trim($value));
+        if (!is_string($normalized)) {
+            return null;
+        }
+        if (preg_match('/^0(?:70|80|81|90|91)[0-9]{8}$/', $normalized) === 1) {
+            $normalized = '+234' . substr($normalized, 1);
+        }
+
+        return preg_match('/^\+[1-9][0-9]{7,14}$/', $normalized) === 1 ? $normalized : null;
+    }
+
+    private function validHttpsUrl(string $value): bool
+    {
+        if (strlen($value) > 2048 || filter_var($value, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+        $scheme = parse_url($value, PHP_URL_SCHEME);
+        $host = parse_url($value, PHP_URL_HOST);
+
+        return $scheme === 'https' && is_string($host) && $host !== '';
+    }
+}

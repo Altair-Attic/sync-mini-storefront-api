@@ -5,6 +5,10 @@
          colors="true"
          failOnRisky="true"
          failOnWarning="true">
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="RUN_DB_INTEGRATION_TESTS" value="1" force="true"/>
+    </php>
     <testsuites>
         <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>
         <testsuite name="Integration"><directory>tests/Integration</directory></testsuite>

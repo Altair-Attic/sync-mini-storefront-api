@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ProjectSync\Infrastructure;
 
 use ProjectSync\Controllers\HealthController;
+use ProjectSync\Controllers\BusinessProfileController;
 use ProjectSync\Controllers\Admin\AuthController;
 use ProjectSync\Controllers\Admin\CurrentAdminController;
 use ProjectSync\Infrastructure\Session\SessionManager;
@@ -13,10 +14,13 @@ use ProjectSync\Middleware\AuthenticationMiddleware;
 use ProjectSync\Middleware\CsrfMiddleware;
 use ProjectSync\Middleware\RequestIdMiddleware;
 use ProjectSync\Repositories\LoginAttemptRepository;
+use ProjectSync\Repositories\BusinessProfileRepository;
 use ProjectSync\Repositories\MerchantUserRepository;
 use ProjectSync\Services\AuthenticationService;
 use ProjectSync\Services\CsrfTokenService;
 use ProjectSync\Services\LoginRateLimiter;
+use ProjectSync\Services\BusinessProfileService;
+use ProjectSync\Validators\BusinessProfileValidator;
 use ProjectSync\Validators\LoginValidator;
 
 final class AppFactory
@@ -50,11 +54,21 @@ final class AppFactory
         $auth = new AuthenticationService(new MerchantUserRepository($connection), new LoginRateLimiter(new LoginAttemptRepository($connection), $config), $session, $csrf, $logger);
         $authenticationMiddleware = new AuthenticationMiddleware($auth);
         $csrfMiddleware = new CsrfMiddleware($csrf, $logger);
+        $profileController = new BusinessProfileController(
+            new BusinessProfileService(new BusinessProfileRepository($connection), new BusinessProfileValidator()),
+            $authenticationMiddleware,
+            $csrfMiddleware,
+            static function (): string {
+                $body = file_get_contents('php://input');
+
+                return is_string($body) ? $body : '';
+            },
+        );
 
         return new Application(
             config: $config,
             logger: $logger,
-            routes: $routes(new HealthController(), new AuthController($auth, new LoginValidator(), $csrf, $csrfMiddleware, $authenticationMiddleware), new CurrentAdminController($authenticationMiddleware)),
+            routes: $routes(new HealthController(), new AuthController($auth, new LoginValidator(), $csrf, $csrfMiddleware, $authenticationMiddleware), new CurrentAdminController($authenticationMiddleware), $profileController),
             middleware: [new RequestIdMiddleware(), new CorsMiddleware($config->stringList('cors.allowed_origins'))],
         );
     }
