@@ -1,9 +1,12 @@
 /.env
+/.env.testing
 /vendor/
 /storage/logs/*
 !/storage/logs/.gitignore
 /storage/uploads/*
 !/storage/uploads/.gitignore
+/storage/private/onboarding/*.json
+/storage/private/onboarding/*.json
 /.phpunit.cache/
 /coverage/
 /var/

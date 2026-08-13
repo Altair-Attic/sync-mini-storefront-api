@@ -21,7 +21,7 @@ final class MigrationRunnerTest extends TestCase
         $connection->method('exec')->willReturn(0);
         $connection->expects(self::never())->method('beginTransaction');
         $connection->expects(self::never())->method('commit');
-        $connection->expects(self::exactly(3))->method('prepare')->willReturnOnConsecutiveCalls($applied, $batch, $record);
+        $connection->expects(self::exactly(6))->method('prepare')->willReturnOnConsecutiveCalls($applied, $batch, $record, $record, $record, $record);
         $applied->method('execute')->willReturn(true);
         $applied->method('fetchAll')->willReturn([]);
         $batch->method('execute')->willReturn(true);
@@ -30,6 +30,11 @@ final class MigrationRunnerTest extends TestCase
 
         $executed = (new MigrationRunner($connection, dirname(__DIR__, 2) . '/database/migrations'))->run();
 
-        self::assertSame(['202608130001_create_schema_migrations'], $executed);
+        self::assertSame([
+            '202608130001_create_schema_migrations',
+            '202608130002_create_business_profiles_table',
+            '202608130003_create_merchant_users_table',
+            '202608130004_create_login_attempts_table',
+        ], $executed);
     }
 }

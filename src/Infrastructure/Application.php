@@ -64,9 +64,9 @@ final readonly class Application
             } elseif ($routeInfo[0] === Dispatcher::METHOD_NOT_ALLOWED) {
                 $response = JsonResponse::error('METHOD_NOT_ALLOWED', 'The HTTP method is not allowed for this resource.', $requestId, 405);
             } else {
-                /** @var callable(string): HttpResponse $handler */
+                /** @var callable $handler */
                 $handler = $routeInfo[1];
-                $response = $handler($requestId);
+                $response = $handler($requestId, $server, $routeInfo[2]);
             }
 
             $response = $this->withCors($response, $origin);
@@ -94,6 +94,7 @@ final readonly class Application
         $headers = $response->headers;
         $headers['Access-Control-Allow-Origin'] = $origin;
         $headers['Vary'] = 'Origin';
+        $headers['Access-Control-Allow-Credentials'] = 'true';
         return new HttpResponse($response->status, $headers, $response->body);
     }
 

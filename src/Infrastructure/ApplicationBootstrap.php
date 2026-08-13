@@ -27,9 +27,21 @@ final class ApplicationBootstrap
 
     public static function loadEnvironment(string $root): void
     {
+        if (getenv('APP_ENV') === 'testing' && is_file($root . '/.env.testing')) {
+            self::copyProcessEnvironmentValue('RUN_DB_INTEGRATION_TESTS');
+            Dotenv::createImmutable($root, '.env.testing')->safeLoad();
+
+            return;
+        }
         if (is_file($root . '/.env')) {
             Dotenv::createImmutable($root)->safeLoad();
         }
+    }
+
+    private static function copyProcessEnvironmentValue(string $key): void
+    {
+        $value = getenv($key);
+        if (is_string($value)) $_ENV[$key] = $value;
     }
 
     public static function emit(HttpResponse $response): void

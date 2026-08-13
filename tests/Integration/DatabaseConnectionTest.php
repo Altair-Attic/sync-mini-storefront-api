@@ -16,10 +16,10 @@ final class DatabaseConnectionTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         ApplicationBootstrap::loadEnvironment($root);
-        if (($_ENV['RUN_DB_INTEGRATION_TESTS'] ?? null) !== '1') {
-            self::markTestSkipped('Set RUN_DB_INTEGRATION_TESTS=1 with disposable MySQL credentials to run this test.');
-        }
+        self::assertSame('testing', getenv('APP_ENV'), 'Database integration tests require APP_ENV=testing.');
+        self::assertSame('1', $_ENV['RUN_DB_INTEGRATION_TESTS'] ?? null, 'Database integration tests require RUN_DB_INTEGRATION_TESTS=1.');
         $database = require $root . '/config/database.php';
+        self::assertStringEndsWith('_test', $database['database'], 'Database integration tests require a disposable *_test database.');
         $connection = new DatabaseConnection(new Config([
             'db.host' => $database['host'],
             'db.port' => (string) $database['port'],

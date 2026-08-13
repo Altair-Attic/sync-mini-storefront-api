@@ -26,7 +26,8 @@ final readonly class CorsMiddleware
             'Content-Type' => 'application/json; charset=utf-8',
             'Access-Control-Allow-Origin' => $origin,
             'Access-Control-Allow-Methods' => 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers' => 'Content-Type, X-Request-Id',
+            'Access-Control-Allow-Headers' => 'Content-Type, X-Request-Id, X-CSRF-Token',
+            'Access-Control-Allow-Credentials' => 'true',
             'Access-Control-Max-Age' => '600',
             'Vary' => 'Origin',
         ], []);

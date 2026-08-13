@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "business": {
+    "business_name": "Demo Store",
+    "slug": "demo-store",
+    "domain": "demo.sync.business",
+    "whatsapp_number": "+2349035732952",
+    "support_email": "support@example.com",
+    "currency": "NGN",
+    "timezone": "Africa/Lagos",
+    "template_id": "default",
+    "logo_url": null
+  },
+  "administrator": {
+    "name": "Business Owner",
+    "email": "owner@example.com"
+  },
+  "settings": {
+    "order_confirmation_email": true,
+    "whatsapp_handoff": true,
+    "delivery_enabled": true
+  }
+}
