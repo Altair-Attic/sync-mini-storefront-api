@@ -44,4 +44,4 @@ Validation and normalization:
 - `currency`: normalized to uppercase; only `NGN` is supported.
 - `timezone`: trimmed and required to match a PHP timezone identifier.
 
-Errors are `401 UNAUTHENTICATED`, `403 CSRF_INVALID`, `415 UNSUPPORTED_MEDIA_TYPE`, `422 VALIDATION_FAILED`, `404 BUSINESS_PROFILE_NOT_FOUND`, or the production-safe `500 INTERNAL_ERROR` envelope. Validation errors contain only field-level safe messages.
+Errors are `401 UNAUTHENTICATED`, `403 CSRF_TOKEN_INVALID`, `415 UNSUPPORTED_MEDIA_TYPE`, `422 VALIDATION_FAILED`, `404 BUSINESS_PROFILE_NOT_FOUND`, or the production-safe `500 INTERNAL_ERROR` envelope. Validation errors contain only field-level safe messages.

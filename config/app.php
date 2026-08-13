@@ -23,4 +23,22 @@ return [
         'block_seconds' => (int) $env('LOGIN_BLOCK_SECONDS', '900'),
         'rate_limit_secret' => $env('RATE_LIMIT_SECRET'),
     ],
+    'product_images' => [
+        'max_bytes' => (int) $env('PRODUCT_IMAGE_MAX_BYTES', '5242880'),
+        'max_width' => (int) $env('PRODUCT_IMAGE_MAX_WIDTH', '2000'),
+        'max_height' => (int) $env('PRODUCT_IMAGE_MAX_HEIGHT', '2000'),
+        'storage_path' => $env('PRODUCT_IMAGE_STORAGE_PATH', dirname(__DIR__) . '/storage/uploads/products'),
+        'public_path' => $env('PRODUCT_IMAGE_PUBLIC_PATH', '/uploads/products'),
+    ],
+    'checkout' => [
+        'security_secret' => $env('ORDER_SECURITY_SECRET', $env('RATE_LIMIT_SECRET')),
+        'max_distinct_items' => (int) $env('CHECKOUT_MAX_DISTINCT_ITEMS', '50'),
+        'max_quantity' => (int) $env('CHECKOUT_MAX_QUANTITY', '100'),
+        'max_total_kobo' => (int) $env('CHECKOUT_MAX_TOTAL_KOBO', '4294967295'),
+        'idempotency_key_max_length' => (int) $env('IDEMPOTENCY_KEY_MAX_LENGTH', '200'),
+        'max_attempts' => (int) $env('CHECKOUT_MAX_ATTEMPTS', '30'),
+        'confirmation_max_attempts' => (int) $env('CONFIRMATION_MAX_ATTEMPTS', '20'),
+        'window_seconds' => (int) $env('CHECKOUT_WINDOW_SECONDS', '60'),
+        'block_seconds' => (int) $env('CHECKOUT_BLOCK_SECONDS', '300'),
+    ],
 ];

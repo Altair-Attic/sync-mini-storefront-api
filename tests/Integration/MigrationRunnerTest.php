@@ -21,7 +21,7 @@ final class MigrationRunnerTest extends TestCase
         $connection->method('exec')->willReturn(0);
         $connection->expects(self::never())->method('beginTransaction');
         $connection->expects(self::never())->method('commit');
-        $connection->expects(self::exactly(6))->method('prepare')->willReturnOnConsecutiveCalls($applied, $batch, $record, $record, $record, $record);
+        $connection->expects(self::exactly(8))->method('prepare')->willReturnOnConsecutiveCalls($applied, $batch, $record, $record, $record, $record, $record, $record);
         $applied->method('execute')->willReturn(true);
         $applied->method('fetchAll')->willReturn([]);
         $batch->method('execute')->willReturn(true);
@@ -35,6 +35,8 @@ final class MigrationRunnerTest extends TestCase
             '202608130002_create_business_profiles_table',
             '202608130003_create_merchant_users_table',
             '202608130004_create_login_attempts_table',
+            '202608130005_create_categories_table',
+            '202608130006_create_products_table',
         ], $executed);
     }
 }

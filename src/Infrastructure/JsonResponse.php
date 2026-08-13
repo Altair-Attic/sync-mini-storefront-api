@@ -6,13 +6,16 @@ namespace ProjectSync\Infrastructure;
 
 final class JsonResponse
 {
-    /** @param array<string, mixed> $data */
-    public static function success(array $data, string $requestId, int $status = 200): HttpResponse
+    /**
+     * @param array<array-key, mixed> $data
+     * @param array<string, mixed> $meta
+     */
+    public static function success(array $data, string $requestId, int $status = 200, array $meta = []): HttpResponse
     {
         return new HttpResponse($status, ['Content-Type' => 'application/json; charset=utf-8'], [
             'success' => true,
             'data' => $data,
-            'meta' => ['request_id' => $requestId],
+            'meta' => $meta + ['request_id' => $requestId],
         ]);
     }
 

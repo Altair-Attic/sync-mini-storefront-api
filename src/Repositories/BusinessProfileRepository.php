@@ -35,11 +35,11 @@ final readonly class BusinessProfileRepository
     }
 
     /**
-     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string}|null
+     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string}|null
      */
     public function findProfile(): ?array
     {
-        $statement = $this->db->prepare('SELECT id, business_name, slug, domain, whatsapp_number, support_email, logo_url, template_id, currency, timezone, created_at, updated_at FROM business_profiles LIMIT 1');
+        $statement = $this->db->prepare('SELECT id, business_name, slug, domain, whatsapp_number, support_email, logo_url, template_id, currency, timezone, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo, created_at, updated_at FROM business_profiles LIMIT 1');
         $statement->execute();
         $row = $statement->fetch(\PDO::FETCH_ASSOC);
         if ($row === false) {
@@ -52,16 +52,16 @@ final readonly class BusinessProfileRepository
         return $this->profile($row);
     }
 
-    /** @param array{business_name: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string} $profile */
+    /** @param array{business_name: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int} $profile */
     public function updateProfile(string $id, array $profile): void
     {
-        $statement = $this->db->prepare('UPDATE business_profiles SET business_name = :business_name, whatsapp_number = :whatsapp_number, support_email = :support_email, logo_url = :logo_url, template_id = :template_id, currency = :currency, timezone = :timezone, updated_at = UTC_TIMESTAMP() WHERE id = :id');
+        $statement = $this->db->prepare('UPDATE business_profiles SET business_name = :business_name, whatsapp_number = :whatsapp_number, support_email = :support_email, logo_url = :logo_url, template_id = :template_id, currency = :currency, timezone = :timezone, delivery_enabled = :delivery_enabled, pickup_enabled = :pickup_enabled, fixed_delivery_fee_kobo = :fixed_delivery_fee_kobo, updated_at = UTC_TIMESTAMP() WHERE id = :id');
         $statement->execute($profile + ['id' => $id]);
     }
 
     /**
      * @param array<array-key, mixed> $row
-     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string}
+     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string}
      */
     private function profile(array $row): array
     {
@@ -84,6 +84,9 @@ final readonly class BusinessProfileRepository
         if (!is_string($logoUrl) && $logoUrl !== null) {
             throw new RuntimeException('Invalid business profile record.');
         }
+        $deliveryEnabled = $this->boolean($row, 'delivery_enabled');
+        $pickupEnabled = $this->boolean($row, 'pickup_enabled');
+        $fixedDeliveryFee = $this->integer($row, 'fixed_delivery_fee_kobo');
 
         return [
             'id' => $row['id'],
@@ -96,8 +99,33 @@ final readonly class BusinessProfileRepository
             'template_id' => $row['template_id'],
             'currency' => $row['currency'],
             'timezone' => $row['timezone'],
+            'delivery_enabled' => $deliveryEnabled,
+            'pickup_enabled' => $pickupEnabled,
+            'fixed_delivery_fee_kobo' => $fixedDeliveryFee,
             'created_at' => $row['created_at'],
             'updated_at' => $row['updated_at'],
         ];
+    }
+
+    /** @param array<array-key, mixed> $row */
+    private function integer(array $row, string $field): int
+    {
+        $value = $row[$field] ?? null;
+        if (!is_int($value) && !(is_string($value) && ctype_digit($value))) {
+            throw new RuntimeException('Invalid business profile record.');
+        }
+
+        return (int) $value;
+    }
+
+    /** @param array<array-key, mixed> $row */
+    private function boolean(array $row, string $field): bool
+    {
+        $value = $this->integer($row, $field);
+        if ($value !== 0 && $value !== 1) {
+            throw new RuntimeException('Invalid business profile record.');
+        }
+
+        return $value === 1;
     }
 }

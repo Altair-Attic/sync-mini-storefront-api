@@ -8,5 +8,6 @@
 /storage/private/onboarding/*.json
 /storage/private/onboarding/*.json
 /.phpunit.cache/
+/.phpunit.result.cache
 /coverage/
 /var/

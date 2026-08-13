@@ -20,6 +20,6 @@ final readonly class CsrfMiddleware
         if (is_string($token) && $this->csrf->valid($token)) return null;
         $this->logger->warning('Invalid CSRF attempt.', ['request_id' => $requestId]);
 
-        return JsonResponse::error('CSRF_INVALID', 'The request could not be verified.', $requestId, 403);
+        return JsonResponse::error('CSRF_TOKEN_INVALID', 'The request could not be verified.', $requestId, 403);
     }
 }

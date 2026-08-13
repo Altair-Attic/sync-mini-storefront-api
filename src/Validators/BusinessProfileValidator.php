@@ -17,6 +17,9 @@ final class BusinessProfileValidator
         'template_id',
         'currency',
         'timezone',
+        'delivery_enabled',
+        'pickup_enabled',
+        'fixed_delivery_fee_kobo',
     ];
 
     /**
@@ -72,6 +75,22 @@ final class BusinessProfileValidator
             $errors['timezone'] = ['Enter a valid timezone.'];
         }
 
+        $deliveryEnabled = $input['delivery_enabled'] ?? null;
+        if (!is_bool($deliveryEnabled)) {
+            $errors['delivery_enabled'] = ['Enter true or false.'];
+        }
+        $pickupEnabled = $input['pickup_enabled'] ?? null;
+        if (!is_bool($pickupEnabled)) {
+            $errors['pickup_enabled'] = ['Enter true or false.'];
+        }
+        if ($deliveryEnabled === false && $pickupEnabled === false) {
+            $errors['fulfilment_methods'] = ['At least one fulfilment method must remain enabled.'];
+        }
+        $deliveryFee = $input['fixed_delivery_fee_kobo'] ?? null;
+        if (!is_int($deliveryFee) || $deliveryFee < 0 || $deliveryFee > 4_294_967_295) {
+            $errors['fixed_delivery_fee_kobo'] = ['Enter a non-negative integer amount in kobo.'];
+        }
+
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
@@ -83,6 +102,9 @@ final class BusinessProfileValidator
             'template_id' => strtolower($templateId),
             'currency' => strtoupper($currency),
             'timezone' => $timezone,
+            'delivery_enabled' => $deliveryEnabled,
+            'pickup_enabled' => $pickupEnabled,
+            'fixed_delivery_fee_kobo' => $deliveryFee,
         ];
     }
 

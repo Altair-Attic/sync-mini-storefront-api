@@ -18,7 +18,7 @@ final readonly class BusinessProfileService
     ) {
     }
 
-    /** @return array{business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string} */
+    /** @return array{business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int} */
     public function publicProfile(): array
     {
         $profile = $this->profile();
@@ -33,10 +33,13 @@ final readonly class BusinessProfileService
             'template_id' => $profile['template_id'],
             'currency' => $profile['currency'],
             'timezone' => $profile['timezone'],
+            'delivery_enabled' => $profile['delivery_enabled'],
+            'pickup_enabled' => $profile['pickup_enabled'],
+            'fixed_delivery_fee_kobo' => $profile['fixed_delivery_fee_kobo'],
         ];
     }
 
-    /** @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string} */
+    /** @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string} */
     public function adminProfile(): array
     {
         return $this->adminResponse($this->profile());
@@ -44,7 +47,7 @@ final readonly class BusinessProfileService
 
     /**
      * @param array<string, mixed> $input
-     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string}
+     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string}
      */
     public function update(array $input): array
     {
@@ -55,7 +58,7 @@ final readonly class BusinessProfileService
         return $this->adminResponse($this->profile());
     }
 
-    /** @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string} */
+    /** @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string} */
     private function profile(): array
     {
         $profile = $this->profiles->findProfile();
@@ -67,8 +70,8 @@ final readonly class BusinessProfileService
     }
 
     /**
-     * @param array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string} $profile
-     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string}
+     * @param array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string} $profile
+     * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string}
      */
     private function adminResponse(array $profile): array
     {

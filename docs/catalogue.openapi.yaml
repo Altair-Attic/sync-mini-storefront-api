@@ -1,0 +1,140 @@
+openapi: 3.1.0
+info:
+  title: Project Sync Catalogue API
+  version: 1.0.0
+servers:
+  - url: https://business.example
+paths:
+  /api/v1/categories:
+    get:
+      summary: List active storefront categories
+      responses:
+        '200': {description: Active categories, content: {application/json: {schema: {$ref: '#/components/schemas/CategoryListResponse'}}}}
+  /api/v1/admin/categories:
+    get:
+      summary: List all categories
+      security: [{sessionCookie: []}]
+      responses: {'200': {description: All categories}, '401': {$ref: '#/components/responses/Unauthenticated'}}
+    post:
+      summary: Create a category
+      security: [{sessionCookie: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CategoryInput'}}}}
+      responses: {'201': {description: Created}, '409': {description: CATEGORY_SLUG_CONFLICT}, '422': {$ref: '#/components/responses/ValidationFailed'}}
+  /api/v1/admin/categories/{id}:
+    parameters: [{$ref: '#/components/parameters/InternalId'}]
+    get:
+      summary: Get a category
+      security: [{sessionCookie: []}]
+      responses: {'200': {description: Category}, '404': {description: CATEGORY_NOT_FOUND}}
+    put:
+      summary: Replace a category
+      security: [{sessionCookie: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CategoryInput'}}}}
+      responses: {'200': {description: Updated}, '409': {description: CATEGORY_SLUG_CONFLICT}, '422': {$ref: '#/components/responses/ValidationFailed'}}
+    delete:
+      summary: Deactivate a category
+      security: [{sessionCookie: [], csrfToken: []}]
+      responses: {'200': {description: Deactivated}, '404': {description: CATEGORY_NOT_FOUND}}
+  /api/v1/products:
+    get:
+      summary: List active storefront products
+      parameters:
+        - {name: category, in: query, schema: {type: string}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+        - {$ref: '#/components/parameters/Sort'}
+      responses:
+        '200': {description: Product page, content: {application/json: {schema: {$ref: '#/components/schemas/ProductListResponse'}}}}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+  /api/v1/products/{slug}:
+    get:
+      summary: Get an active storefront product
+      parameters: [{name: slug, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: Product}, '404': {description: PRODUCT_NOT_FOUND}}
+  /api/v1/admin/products:
+    get:
+      summary: List products for administration
+      security: [{sessionCookie: []}]
+      parameters:
+        - {name: category_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive, all], default: all}}
+        - {name: search, in: query, schema: {type: string, maxLength: 160}}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/PerPage'}
+        - {$ref: '#/components/parameters/Sort'}
+      responses: {'200': {description: Product page}, '401': {$ref: '#/components/responses/Unauthenticated'}, '422': {$ref: '#/components/responses/ValidationFailed'}}
+    post:
+      summary: Create a product
+      security: [{sessionCookie: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProductInput'}}}}
+      responses: {'201': {description: Created}, '409': {description: PRODUCT_SLUG_CONFLICT}, '422': {$ref: '#/components/responses/ValidationFailed'}}
+  /api/v1/admin/products/{id}:
+    parameters: [{$ref: '#/components/parameters/InternalId'}]
+    get:
+      summary: Get a product for administration
+      security: [{sessionCookie: []}]
+      responses: {'200': {description: Product}, '404': {description: PRODUCT_NOT_FOUND}}
+    put:
+      summary: Replace a product
+      security: [{sessionCookie: [], csrfToken: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProductInput'}}}}
+      responses: {'200': {description: Updated}, '409': {description: PRODUCT_SLUG_CONFLICT}, '422': {$ref: '#/components/responses/ValidationFailed'}}
+    delete:
+      summary: Deactivate a product
+      security: [{sessionCookie: [], csrfToken: []}]
+      responses: {'200': {description: Deactivated}, '404': {description: PRODUCT_NOT_FOUND}}
+  /api/v1/admin/products/{id}/image:
+    parameters: [{$ref: '#/components/parameters/InternalId'}]
+    post:
+      summary: Upload the primary product image
+      security: [{sessionCookie: [], csrfToken: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {type: object, required: [image], properties: {image: {type: string, format: binary}}}
+      responses: {'200': {description: Updated product}, '404': {description: PRODUCT_NOT_FOUND}, '413': {description: UPLOAD_TOO_LARGE}, '415': {description: UNSUPPORTED_MEDIA_TYPE}}
+components:
+  securitySchemes:
+    sessionCookie: {type: apiKey, in: cookie, name: project_sync_admin}
+    csrfToken: {type: apiKey, in: header, name: X-CSRF-Token}
+  parameters:
+    InternalId: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    Page: {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+    PerPage: {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+    Sort: {name: sort, in: query, schema: {type: string, enum: [display_order, title, price_low, price_high, newest], default: display_order}}
+  schemas:
+    CategoryInput:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: {type: string, minLength: 2, maxLength: 100}
+        slug: {type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'}
+        description: {type: [string, 'null'], maxLength: 1000}
+        display_order: {type: integer, minimum: 0, default: 0}
+        is_active: {type: boolean, default: true}
+    ProductInput:
+      type: object
+      required: [title, price_kobo]
+      additionalProperties: false
+      properties:
+        category_id: {type: [string, 'null'], format: uuid}
+        slug: {type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'}
+        title: {type: string, minLength: 2, maxLength: 160}
+        description: {type: [string, 'null'], maxLength: 10000}
+        price_kobo: {type: integer, minimum: 0}
+        image_url: {type: [string, 'null']}
+        is_active: {type: boolean, default: true}
+        display_order: {type: integer, minimum: 0, default: 0}
+    CategoryListResponse:
+      type: object
+      required: [success, data, meta]
+      properties: {success: {const: true}, data: {type: array, items: {type: object}}, meta: {type: object}}
+    ProductListResponse:
+      type: object
+      required: [success, data, meta]
+      properties: {success: {const: true}, data: {type: array, items: {type: object}}, meta: {type: object, required: [page, per_page, total, total_pages, request_id]}}
+  responses:
+    Unauthenticated: {description: UNAUTHENTICATED}
+    ValidationFailed: {description: VALIDATION_FAILED}

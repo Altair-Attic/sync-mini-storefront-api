@@ -1,2 +1,6 @@
 *
 !.gitignore
+!products/
+products/*
+!products/.gitignore
+!products/.htaccess

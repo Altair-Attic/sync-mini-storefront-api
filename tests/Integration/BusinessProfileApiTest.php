@@ -104,7 +104,7 @@ final class BusinessProfileApiTest extends TestCase
         $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $this->validInput());
 
         self::assertSame(403, $response->status);
-        self::assertSame('CSRF_INVALID', $this->responseError($response)['code']);
+        self::assertSame('CSRF_TOKEN_INVALID', $this->responseError($response)['code']);
     }
 
     public function testMissingJsonContentTypeIsRejected(): void
