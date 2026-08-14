@@ -20,11 +20,15 @@ final class BusinessProfileValidator
         'delivery_enabled',
         'pickup_enabled',
         'fixed_delivery_fee_kobo',
+        'order_notification_email',
+        'merchant_email_notifications_enabled',
+        'customer_email_notifications_enabled',
+        'whatsapp_handoff_enabled',
     ];
 
     /**
      * @param array<string, mixed> $input
-     * @return array{business_name: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string}
+     * @return array{business_name: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, order_notification_email: string|null, merchant_email_notifications_enabled: bool, customer_email_notifications_enabled: bool, whatsapp_handoff_enabled: bool}
      */
     public function validate(array $input): array
     {
@@ -90,9 +94,28 @@ final class BusinessProfileValidator
         if (!is_int($deliveryFee) || $deliveryFee < 0 || $deliveryFee > 4_294_967_295) {
             $errors['fixed_delivery_fee_kobo'] = ['Enter a non-negative integer amount in kobo.'];
         }
+        $notificationEmail = $this->nullableString($input, 'order_notification_email');
+        if ($notificationEmail !== null && (strlen($notificationEmail) > 254 || filter_var($notificationEmail, FILTER_VALIDATE_EMAIL) === false)) {
+            $errors['order_notification_email'] = ['Enter a valid email address or null.'];
+        }
+        $merchantNotifications = $input['merchant_email_notifications_enabled'] ?? null;
+        if (!is_bool($merchantNotifications)) {
+            $errors['merchant_email_notifications_enabled'] = ['Enter true or false.'];
+        }
+        $customerNotifications = $input['customer_email_notifications_enabled'] ?? null;
+        if (!is_bool($customerNotifications)) {
+            $errors['customer_email_notifications_enabled'] = ['Enter true or false.'];
+        }
+        $whatsappHandoff = $input['whatsapp_handoff_enabled'] ?? null;
+        if (!is_bool($whatsappHandoff)) {
+            $errors['whatsapp_handoff_enabled'] = ['Enter true or false.'];
+        }
 
         if ($errors !== []) {
             throw new ValidationException($errors);
+        }
+        if (!is_bool($pickupEnabled) || !is_int($deliveryFee) || !is_bool($merchantNotifications) || !is_bool($customerNotifications) || !is_bool($whatsappHandoff)) {
+            throw new \LogicException('Validated business settings have invalid types.');
         }
         return [
             'business_name' => $businessName,
@@ -105,6 +128,10 @@ final class BusinessProfileValidator
             'delivery_enabled' => $deliveryEnabled,
             'pickup_enabled' => $pickupEnabled,
             'fixed_delivery_fee_kobo' => $deliveryFee,
+            'order_notification_email' => $notificationEmail === null ? null : strtolower($notificationEmail),
+            'merchant_email_notifications_enabled' => $merchantNotifications,
+            'customer_email_notifications_enabled' => $customerNotifications,
+            'whatsapp_handoff_enabled' => $whatsappHandoff,
         ];
     }
 

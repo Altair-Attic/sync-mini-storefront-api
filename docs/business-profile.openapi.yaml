@@ -83,7 +83,7 @@ components:
     PublicProfile:
       type: object
       additionalProperties: false
-      required: [business_name, slug, domain, whatsapp_number, support_email, logo_url, template_id, currency, timezone]
+      required: [business_name, slug, domain, whatsapp_number, support_email, logo_url, template_id, currency, timezone, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo]
       properties:
         business_name: { type: string, minLength: 2, maxLength: 120 }
         slug: { type: string }
@@ -94,10 +94,13 @@ components:
         template_id: { type: string, pattern: '^[a-z0-9][a-z0-9_-]{0,63}$' }
         currency: { type: string, const: NGN }
         timezone: { type: string }
+        delivery_enabled: { type: boolean }
+        pickup_enabled: { type: boolean }
+        fixed_delivery_fee_kobo: { type: integer, minimum: 0 }
     AdminProfile:
       type: object
       additionalProperties: false
-      required: [id, business_name, slug, domain, whatsapp_number, support_email, logo_url, template_id, currency, timezone, created_at, updated_at]
+      required: [id, business_name, slug, domain, whatsapp_number, support_email, order_notification_email, merchant_email_notifications_enabled, customer_email_notifications_enabled, whatsapp_handoff_enabled, logo_url, template_id, currency, timezone, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo, created_at, updated_at]
       properties:
         id: { type: string }
         business_name: { type: string, minLength: 2, maxLength: 120 }
@@ -105,24 +108,38 @@ components:
         domain: { type: string }
         whatsapp_number: { type: string, pattern: '^\+[1-9][0-9]{7,14}$' }
         support_email: { type: [string, 'null'], format: email, maxLength: 254 }
+        order_notification_email: { type: [string, 'null'], format: email, maxLength: 254 }
+        merchant_email_notifications_enabled: { type: boolean }
+        customer_email_notifications_enabled: { type: boolean }
+        whatsapp_handoff_enabled: { type: boolean }
         logo_url: { type: [string, 'null'], format: uri, maxLength: 2048 }
         template_id: { type: string, pattern: '^[a-z0-9][a-z0-9_-]{0,63}$' }
         currency: { type: string, const: NGN }
         timezone: { type: string }
+        delivery_enabled: { type: boolean }
+        pickup_enabled: { type: boolean }
+        fixed_delivery_fee_kobo: { type: integer, minimum: 0 }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
     ProfileUpdate:
       type: object
       additionalProperties: false
-      required: [business_name, whatsapp_number, support_email, logo_url, template_id, currency, timezone]
+      required: [business_name, whatsapp_number, support_email, order_notification_email, merchant_email_notifications_enabled, customer_email_notifications_enabled, whatsapp_handoff_enabled, logo_url, template_id, currency, timezone, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo]
       properties:
         business_name: { type: string, minLength: 2, maxLength: 120 }
         whatsapp_number: { type: string }
         support_email: { type: [string, 'null'], format: email, maxLength: 254 }
+        order_notification_email: { type: [string, 'null'], format: email, maxLength: 254 }
+        merchant_email_notifications_enabled: { type: boolean }
+        customer_email_notifications_enabled: { type: boolean }
+        whatsapp_handoff_enabled: { type: boolean }
         logo_url: { type: [string, 'null'], format: uri, maxLength: 2048 }
         template_id: { type: string, pattern: '^[a-z0-9][a-z0-9_-]{0,63}$' }
         currency: { type: string, const: NGN }
         timezone: { type: string }
+        delivery_enabled: { type: boolean }
+        pickup_enabled: { type: boolean }
+        fixed_delivery_fee_kobo: { type: integer, minimum: 0 }
     Meta:
       type: object
       required: [request_id]

@@ -8,16 +8,20 @@ use ProjectSync\Controllers\CategoryController;
 use ProjectSync\Controllers\HealthController;
 use ProjectSync\Controllers\ProductController;
 use ProjectSync\Controllers\ProductImageController;
+use ProjectSync\Controllers\OrderController;
+use ProjectSync\Controllers\OrderConfirmationController;
 use ProjectSync\Controllers\Admin\AuthController;
 use ProjectSync\Controllers\Admin\CurrentAdminController;
 
-return static function (HealthController $health, AuthController $auth, CurrentAdminController $current, BusinessProfileController $profile, CategoryController $categories, ProductController $products, ProductImageController $productImages): callable {
-    return static function (RouteCollector $router) use ($health, $auth, $current, $profile, $categories, $products, $productImages): void {
+return static function (HealthController $health, AuthController $auth, CurrentAdminController $current, BusinessProfileController $profile, CategoryController $categories, ProductController $products, ProductImageController $productImages, OrderController $orders, OrderConfirmationController $confirmations): callable {
+    return static function (RouteCollector $router) use ($health, $auth, $current, $profile, $categories, $products, $productImages, $orders, $confirmations): void {
         $router->addRoute('GET', '/api/v1/health', $health);
         $router->addRoute('GET', '/api/v1/store', [$profile, 'store']);
         $router->addRoute('GET', '/api/v1/categories', [$categories, 'publicList']);
         $router->addRoute('GET', '/api/v1/products', [$products, 'publicList']);
         $router->addRoute('GET', '/api/v1/products/{slug}', [$products, 'publicShow']);
+        $router->addRoute('POST', '/api/v1/orders', [$orders, 'create']);
+        $router->addRoute('GET', '/api/v1/orders/{reference}/confirmation', [$confirmations, 'show']);
         $router->addRoute('GET', '/api/v1/admin/csrf-token', [$auth, 'csrf']);
         $router->addRoute('POST', '/api/v1/admin/login', [$auth, 'login']);
         $router->addRoute('GET', '/api/v1/admin/me', [$current, 'me']);

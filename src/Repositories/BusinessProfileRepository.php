@@ -39,7 +39,7 @@ final readonly class BusinessProfileRepository
      */
     public function findProfile(): ?array
     {
-        $statement = $this->db->prepare('SELECT id, business_name, slug, domain, whatsapp_number, support_email, logo_url, template_id, currency, timezone, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo, created_at, updated_at FROM business_profiles LIMIT 1');
+        $statement = $this->db->prepare('SELECT id, business_name, slug, domain, whatsapp_number, support_email, order_notification_email, merchant_email_notifications_enabled, customer_email_notifications_enabled, whatsapp_handoff_enabled, logo_url, template_id, currency, timezone, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo, created_at, updated_at FROM business_profiles LIMIT 1');
         $statement->execute();
         $row = $statement->fetch(\PDO::FETCH_ASSOC);
         if ($row === false) {
@@ -52,10 +52,35 @@ final readonly class BusinessProfileRepository
         return $this->profile($row);
     }
 
+    /** @return array{currency: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int}|null */
+    public function checkoutConfiguration(): ?array
+    {
+        $statement = $this->db->prepare('SELECT currency, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo FROM business_profiles LIMIT 1');
+        $statement->execute();
+        $row = $statement->fetch(\PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
+        if (!is_array($row)) {
+            throw new RuntimeException('Invalid business profile record.');
+        }
+        $currency = $row['currency'] ?? null;
+        if (!is_string($currency)) {
+            throw new RuntimeException('Invalid business profile record.');
+        }
+
+        return [
+            'currency' => $currency,
+            'delivery_enabled' => $this->boolean($row, 'delivery_enabled'),
+            'pickup_enabled' => $this->boolean($row, 'pickup_enabled'),
+            'fixed_delivery_fee_kobo' => $this->integer($row, 'fixed_delivery_fee_kobo'),
+        ];
+    }
+
     /** @param array{business_name: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int} $profile */
     public function updateProfile(string $id, array $profile): void
     {
-        $statement = $this->db->prepare('UPDATE business_profiles SET business_name = :business_name, whatsapp_number = :whatsapp_number, support_email = :support_email, logo_url = :logo_url, template_id = :template_id, currency = :currency, timezone = :timezone, delivery_enabled = :delivery_enabled, pickup_enabled = :pickup_enabled, fixed_delivery_fee_kobo = :fixed_delivery_fee_kobo, updated_at = UTC_TIMESTAMP() WHERE id = :id');
+        $statement = $this->db->prepare('UPDATE business_profiles SET business_name = :business_name, whatsapp_number = :whatsapp_number, support_email = :support_email, order_notification_email = :order_notification_email, merchant_email_notifications_enabled = :merchant_email_notifications_enabled, customer_email_notifications_enabled = :customer_email_notifications_enabled, whatsapp_handoff_enabled = :whatsapp_handoff_enabled, logo_url = :logo_url, template_id = :template_id, currency = :currency, timezone = :timezone, delivery_enabled = :delivery_enabled, pickup_enabled = :pickup_enabled, fixed_delivery_fee_kobo = :fixed_delivery_fee_kobo, updated_at = UTC_TIMESTAMP() WHERE id = :id');
         $statement->execute($profile + ['id' => $id]);
     }
 
@@ -78,10 +103,14 @@ final readonly class BusinessProfileRepository
         }
         $supportEmail = $row['support_email'] ?? null;
         $logoUrl = $row['logo_url'] ?? null;
+        $notificationEmail = $row['order_notification_email'] ?? null;
         if (!is_string($supportEmail) && $supportEmail !== null) {
             throw new RuntimeException('Invalid business profile record.');
         }
         if (!is_string($logoUrl) && $logoUrl !== null) {
+            throw new RuntimeException('Invalid business profile record.');
+        }
+        if (!is_string($notificationEmail) && $notificationEmail !== null) {
             throw new RuntimeException('Invalid business profile record.');
         }
         $deliveryEnabled = $this->boolean($row, 'delivery_enabled');
@@ -95,6 +124,10 @@ final readonly class BusinessProfileRepository
             'domain' => $row['domain'],
             'whatsapp_number' => $row['whatsapp_number'],
             'support_email' => $supportEmail,
+            'order_notification_email' => $notificationEmail,
+            'merchant_email_notifications_enabled' => $this->boolean($row, 'merchant_email_notifications_enabled'),
+            'customer_email_notifications_enabled' => $this->boolean($row, 'customer_email_notifications_enabled'),
+            'whatsapp_handoff_enabled' => $this->boolean($row, 'whatsapp_handoff_enabled'),
             'logo_url' => $logoUrl,
             'template_id' => $row['template_id'],
             'currency' => $row['currency'],
@@ -104,6 +137,41 @@ final readonly class BusinessProfileRepository
             'fixed_delivery_fee_kobo' => $fixedDeliveryFee,
             'created_at' => $row['created_at'],
             'updated_at' => $row['updated_at'],
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    public function notificationConfiguration(): ?array
+    {
+        $statement = $this->db->prepare('SELECT business_name, whatsapp_number, support_email, order_notification_email, merchant_email_notifications_enabled, customer_email_notifications_enabled, whatsapp_handoff_enabled, currency FROM business_profiles LIMIT 1');
+        $statement->execute();
+        $row = $statement->fetch(\PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
+        if (!is_array($row)) {
+            throw new RuntimeException('Invalid business profile record.');
+        }
+        foreach (['business_name', 'whatsapp_number', 'currency'] as $field) {
+            if (!isset($row[$field]) || !is_string($row[$field])) {
+                throw new RuntimeException('Invalid business profile record.');
+            }
+        }
+        foreach (['support_email', 'order_notification_email'] as $field) {
+            if (($row[$field] ?? null) !== null && !is_string($row[$field])) {
+                throw new RuntimeException('Invalid business profile record.');
+            }
+        }
+
+        return [
+            'business_name' => $row['business_name'],
+            'whatsapp_number' => $row['whatsapp_number'],
+            'support_email' => $row['support_email'] ?? null,
+            'order_notification_email' => $row['order_notification_email'] ?? null,
+            'merchant_email_notifications_enabled' => $this->boolean($row, 'merchant_email_notifications_enabled'),
+            'customer_email_notifications_enabled' => $this->boolean($row, 'customer_email_notifications_enabled'),
+            'whatsapp_handoff_enabled' => $this->boolean($row, 'whatsapp_handoff_enabled'),
+            'currency' => $row['currency'],
         ];
     }
 

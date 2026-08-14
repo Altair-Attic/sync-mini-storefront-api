@@ -41,4 +41,22 @@ return [
         'window_seconds' => (int) $env('CHECKOUT_WINDOW_SECONDS', '60'),
         'block_seconds' => (int) $env('CHECKOUT_BLOCK_SECONDS', '300'),
     ],
+    'mail' => [
+        'enabled' => filter_var($env('MAIL_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
+        'host' => $env('MAIL_HOST'),
+        'port' => (int) $env('MAIL_PORT', '587'),
+        'username' => $env('MAIL_USERNAME'),
+        'password' => $env('MAIL_PASSWORD'),
+        'encryption' => strtolower($env('MAIL_ENCRYPTION', 'tls')),
+        'from_address' => $env('MAIL_FROM_ADDRESS'),
+        'from_name' => $env('MAIL_FROM_NAME', 'Project Sync Store'),
+        'timeout_seconds' => (int) $env('MAIL_TIMEOUT_SECONDS', '10'),
+    ],
+    'notifications' => [
+        'max_attempts' => (int) $env('NOTIFICATION_MAX_ATTEMPTS', '5'),
+        'retry_base_seconds' => (int) $env('NOTIFICATION_RETRY_BASE_SECONDS', '300'),
+        'processing_timeout_seconds' => (int) $env('NOTIFICATION_PROCESSING_TIMEOUT_SECONDS', '900'),
+        'batch_limit' => (int) $env('NOTIFICATION_BATCH_LIMIT', '50'),
+        'security_secret' => $env('NOTIFICATION_SECURITY_SECRET', $env('ORDER_SECURITY_SECRET', $env('RATE_LIMIT_SECRET'))),
+    ],
 ];

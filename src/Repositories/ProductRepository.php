@@ -59,6 +59,48 @@ final readonly class ProductRepository
     }
 
     /**
+     * Loads all checkout products in one bounded query, including inactive rows so
+     * the service can reject the entire cart without disclosing which condition failed.
+     *
+     * @param list<string> $publicIds
+     * @return list<array{id: string, public_id: string, slug: string, title: string, price_kobo: int, is_active: bool}>
+     */
+    public function findForCheckout(array $publicIds): array
+    {
+        if ($publicIds === []) {
+            return [];
+        }
+        $placeholders = [];
+        $parameters = [];
+        foreach ($publicIds as $index => $publicId) {
+            $name = 'public_id_' . $index;
+            $placeholders[] = ':' . $name;
+            $parameters[$name] = $publicId;
+        }
+        $statement = $this->db->prepare(
+            'SELECT id, public_id, slug, title, price_kobo, is_active FROM products WHERE public_id IN ('
+            . implode(', ', $placeholders) . ')'
+        );
+        $statement->execute($parameters);
+        $products = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (!is_array($row)) {
+                throw new RuntimeException('Invalid checkout product record.');
+            }
+            $products[] = [
+                'id' => $this->string($row, 'id'),
+                'public_id' => $this->string($row, 'public_id'),
+                'slug' => $this->string($row, 'slug'),
+                'title' => $this->string($row, 'title'),
+                'price_kobo' => $this->integer($row, 'price_kobo'),
+                'is_active' => $this->boolean($row, 'is_active'),
+            ];
+        }
+
+        return $products;
+    }
+
+    /**
      * @param array{category_id: string|null, status: string, search: string|null, page: int, per_page: int, sort: string} $query
      * @return array{items: list<array<string, mixed>>, total: int}
      */

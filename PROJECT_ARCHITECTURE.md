@@ -1071,9 +1071,9 @@ Deliverables:
 |---|---|---|---|
 | D1 | Approve routing, validation, logging, email and testing packages | Backend + PM | Phase 1 |
 | D2 | Confirm same-origin session-cookie authentication | Backend + frontend | API contract |
-| D3 | Define v1 delivery-fee calculation | PM | Checkout |
+| D3 | Resolved 13 August 2026: pickup is free; delivery uses one administrator-configured fixed fee in integer kobo | PM | Checkout |
 | D4 | Define allowed order statuses and transitions | PM + operations | Merchant order management |
-| D5 | Approve WhatsApp message template and Nigerian phone-number normalization | PM | Checkout integration |
+| D5 | Resolved 13 August 2026: concise server-built order summary sent to the normalized digits-only business number through a `wa.me` handoff URL | PM | Checkout integration |
 | D6 | Confirm cPanel PHP, cron, memory, storage and database limits | Operations | Foundation/reporting |
 | D7 | Define cached storefront-status grace period | PM + operations | Central control plane |
 | D8 | Define backup retention, recovery point and recovery time targets | Operations | Pilot |

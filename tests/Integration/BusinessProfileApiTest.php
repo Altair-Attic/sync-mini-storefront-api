@@ -46,10 +46,12 @@ final class BusinessProfileApiTest extends TestCase
 
         self::assertSame(200, $response->status);
         self::assertSame([
-            'business_name', 'slug', 'domain', 'whatsapp_number', 'support_email', 'logo_url', 'template_id', 'currency', 'timezone',
+            'business_name', 'slug', 'domain', 'whatsapp_number', 'support_email', 'logo_url', 'template_id', 'currency', 'timezone', 'delivery_enabled', 'pickup_enabled', 'fixed_delivery_fee_kobo',
         ], array_keys($responseProfile));
         self::assertArrayNotHasKey('id', $responseProfile);
         self::assertArrayNotHasKey('order_confirmation_email', $responseProfile);
+        self::assertArrayNotHasKey('order_notification_email', $responseProfile);
+        self::assertArrayNotHasKey('merchant_email_notifications_enabled', $responseProfile);
     }
 
     public function testAdminProfileRequiresAuthentication(): void
@@ -80,12 +82,16 @@ final class BusinessProfileApiTest extends TestCase
         $input = $this->validInput();
         $input['whatsapp_number'] = '0803 573 2952';
         $input['support_email'] = ' SUPPORT@EXAMPLE.COM ';
+        $input['order_notification_email'] = ' ORDERS@EXAMPLE.COM ';
         $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $input, true);
         $responseProfile = $this->responseProfile($response);
 
         self::assertSame(200, $response->status);
         self::assertSame('+2348035732952', $responseProfile['whatsapp_number']);
         self::assertSame('support@example.com', $responseProfile['support_email']);
+        self::assertSame('orders@example.com', $responseProfile['order_notification_email']);
+        self::assertTrue($responseProfile['merchant_email_notifications_enabled']);
+        self::assertFalse($responseProfile['customer_email_notifications_enabled']);
         self::assertSame('demo-store', $responseProfile['slug']);
         self::assertSame('demo.example.com', $responseProfile['domain']);
     }
@@ -254,7 +260,7 @@ final class BusinessProfileApiTest extends TestCase
                 if (str_starts_with($sql, 'UPDATE business_profiles') && $profile !== null) {
                     foreach ($parameters ?? [] as $field => $value) {
                         if (is_string($field) && array_key_exists($field, $profile)) {
-                            $profile[$field] = $value;
+                            $profile[$field] = is_bool($value) ? (int) $value : $value;
                         }
                     }
                     $profile['updated_at'] = '2026-08-13 12:00:00';
@@ -284,10 +290,17 @@ final class BusinessProfileApiTest extends TestCase
             'domain' => 'demo.example.com',
             'whatsapp_number' => '+2348035732952',
             'support_email' => 'owner@example.com',
+            'order_notification_email' => 'orders@example.com',
+            'merchant_email_notifications_enabled' => 1,
+            'customer_email_notifications_enabled' => 0,
+            'whatsapp_handoff_enabled' => 1,
             'logo_url' => 'https://cdn.example.com/logo.png',
             'template_id' => 'classic',
             'currency' => 'NGN',
             'timezone' => 'Africa/Lagos',
+            'delivery_enabled' => 1,
+            'pickup_enabled' => 1,
+            'fixed_delivery_fee_kobo' => 150000,
             'created_at' => '2026-08-13 10:00:00',
             'updated_at' => '2026-08-13 10:00:00',
         ];
@@ -304,6 +317,13 @@ final class BusinessProfileApiTest extends TestCase
             'template_id' => 'modern',
             'currency' => 'NGN',
             'timezone' => 'Africa/Lagos',
+            'delivery_enabled' => true,
+            'pickup_enabled' => true,
+            'fixed_delivery_fee_kobo' => 150000,
+            'order_notification_email' => 'orders@example.com',
+            'merchant_email_notifications_enabled' => true,
+            'customer_email_notifications_enabled' => false,
+            'whatsapp_handoff_enabled' => true,
         ];
     }
 

@@ -28,6 +28,13 @@ final class BusinessProfileValidatorTest extends TestCase
             'template_id' => 'classic_one',
             'currency' => 'NGN',
             'timezone' => 'Africa/Lagos',
+            'delivery_enabled' => true,
+            'pickup_enabled' => true,
+            'fixed_delivery_fee_kobo' => 150000,
+            'order_notification_email' => 'orders@example.com',
+            'merchant_email_notifications_enabled' => true,
+            'customer_email_notifications_enabled' => false,
+            'whatsapp_handoff_enabled' => true,
         ], (new BusinessProfileValidator())->validate($input));
     }
 
@@ -56,6 +63,10 @@ final class BusinessProfileValidatorTest extends TestCase
         yield 'invalid timezone' => ['timezone', 'Lagos/Local'];
         yield 'HTTP logo URL' => ['logo_url', 'http://example.com/logo.png'];
         yield 'invalid template' => ['template_id', '../classic'];
+        yield 'invalid notification email' => ['order_notification_email', 'not-an-email'];
+        yield 'string merchant notification boolean' => ['merchant_email_notifications_enabled', 'true'];
+        yield 'integer customer notification boolean' => ['customer_email_notifications_enabled', 0];
+        yield 'string WhatsApp boolean' => ['whatsapp_handoff_enabled', 'false'];
     }
 
     public function testItRejectsUnknownAndIdentityFields(): void
@@ -83,6 +94,13 @@ final class BusinessProfileValidatorTest extends TestCase
             'template_id' => 'classic_one',
             'currency' => 'NGN',
             'timezone' => 'Africa/Lagos',
+            'delivery_enabled' => true,
+            'pickup_enabled' => true,
+            'fixed_delivery_fee_kobo' => 150000,
+            'order_notification_email' => 'orders@example.com',
+            'merchant_email_notifications_enabled' => true,
+            'customer_email_notifications_enabled' => false,
+            'whatsapp_handoff_enabled' => true,
         ];
     }
 }

@@ -1,0 +1,139 @@
+openapi: 3.1.0
+info:
+  title: Project Sync Guest Order API
+  version: 1.0.0
+paths:
+  /api/v1/orders:
+    post:
+      summary: Create a transactional guest order
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string, minLength: 16, maxLength: 200 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutRequest' }
+      responses:
+        '201': { description: Order created, content: { application/json: { schema: { $ref: '#/components/schemas/OrderResponse' } } } }
+        '200': { description: Idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/OrderResponse' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /api/v1/orders/{reference}/confirmation:
+    get:
+      summary: Retrieve a confirmation-safe order summary
+      parameters:
+        - in: path
+          name: reference
+          required: true
+          schema: { type: string }
+        - in: query
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Confirmation summary, content: { application/json: { schema: { $ref: '#/components/schemas/ConfirmationResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+components:
+  schemas:
+    CheckoutRequest:
+      type: object
+      additionalProperties: false
+      required: [customer_name, phone_number, fulfilment_method, payment_method, items]
+      properties:
+        customer_name: { type: string, minLength: 2, maxLength: 120 }
+        phone_number: { type: string, description: Nigerian or international number normalized to E.164 }
+        customer_email: { type: [string, 'null'], format: email }
+        fulfilment_method: { type: string, enum: [pickup, delivery] }
+        delivery_address: { type: [string, 'null'], maxLength: 500 }
+        state: { type: [string, 'null'], maxLength: 100 }
+        payment_method: { type: string, const: cash_on_delivery }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [product_id, quantity]
+            properties:
+              product_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+    OrderItem:
+      type: object
+      properties:
+        product_public_id: { type: string, format: uuid }
+        product_title: { type: string }
+        product_slug: { type: string }
+        unit_price_kobo: { type: integer, minimum: 0 }
+        quantity: { type: integer, minimum: 1 }
+        line_total_kobo: { type: integer, minimum: 0 }
+    Order:
+      type: object
+      properties:
+        reference: { type: string }
+        customer_name: { type: string }
+        fulfilment_method: { type: string, enum: [pickup, delivery] }
+        delivery_address: { type: [string, 'null'] }
+        state: { type: [string, 'null'] }
+        subtotal_kobo: { type: integer, minimum: 0 }
+        delivery_fee_kobo: { type: integer, minimum: 0 }
+        total_kobo: { type: integer, minimum: 0 }
+        currency: { type: string, const: NGN }
+        payment_method: { type: string, const: cash_on_delivery }
+        payment_status: { type: string, const: unpaid }
+        fulfilment_status: { type: string, const: new }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+        created_at: { type: string, format: date-time }
+        whatsapp_url: { type: [string, 'null'], format: uri }
+        notification:
+          type: object
+          additionalProperties: false
+          required: [merchant_email, customer_email]
+          properties:
+            merchant_email: { type: string, enum: [sent, queued, skipped] }
+            customer_email: { type: string, enum: [sent, queued, skipped] }
+    OrderResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/Order'
+            - type: object
+              properties: { confirmation_token: { type: string } }
+        meta:
+          type: object
+          properties:
+            request_id: { type: string }
+            idempotent_replay: { type: boolean }
+    ConfirmationResponse:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/Order' }
+        meta: { type: object, properties: { request_id: { type: string } } }
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, const: false }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields: { type: object, additionalProperties: { type: array, items: { type: string } } }
+        meta: { type: object, properties: { request_id: { type: string } } }
+  responses:
+    Error:
+      description: Standard error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
