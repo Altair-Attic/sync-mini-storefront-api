@@ -58,3 +58,21 @@ Status: approved for MVP.
 - Server-side pricing: Unit prices and totals are strictly calculated from current database values; client-submitted totals or unit prices are never trusted or accepted. Order item snapshots in `order_items` preserve checkout-time pricing and titles immutably.
 - Category rules: Products can only be assigned to existing, active categories. Deactivating a category preserves historical product assignments, but public product responses display `category: null`.
 - Admin endpoints require Bearer JWT authentication and support product CRUD, bounded listing with `status`, `availability`, `category_id`, and `search` filters, and dedicated availability toggling via `PATCH /api/v1/admin/products/{id}/availability`.
+
+## 2026-08-17 — Phase 6A / 6A.1 Paystack payment architecture and delivery sequence realignment
+
+Status: approved for Phase 6.
+
+- Delivery Sequence Realignment: Paystack payment processing (originally scheduled for later Phase 9 in `PROJECT_ARCHITECTURE.md`) is intentionally brought forward into Phase 6 to enable commercial merchant revenue capture earlier in the product lifecycle, while preserving single-tenant database isolation, structured plain-PHP boundaries, and zero-trust security.
+- Zero Trust on Client: Frontend state, browser redirects, query parameters, JS callbacks, email receipts, and customer references are non-authoritative and can never mark an order `paid`. The system fails closed.
+- Authoritative Sources: Only cryptographically verified Paystack webhooks (`X-Paystack-Signature` HMAC-SHA512 with `hash_equals()` on raw body bytes) and direct server-to-server TLS verification calls using `PAYSTACK_SECRET_KEY` are authoritative.
+- Decoupled Checkout & Payments: Order creation occurs first (guest checkout commits with `payment_status = 'unpaid'`). Payment initialization is a separate customer action against `POST /api/v1/orders/{ref}/payments`, enabling safe retries, multiple payment attempts, and provider failure isolation.
+- Simplified Aggregate Payment State vs Attempt Status:
+  - Aggregate `orders.payment_status`: `unpaid` $\rightarrow$ `pending` $\rightarrow$ `paid`, and `refunded`. Attempt-level failures do not set order `payment_status = failed`, keeping retry viable on active orders.
+  - Individual `payment_attempts.status`: `initialized` $\rightarrow$ `pending` $\rightarrow$ `successful`, `failed`, `abandoned`.
+  - Order fulfilment lifecycle (`new` $\rightarrow$ `confirmed` $\rightarrow$ `processing` $\rightarrow$ `ready` $\rightarrow$ `completed` / `cancelled`) remains strictly decoupled from payment status.
+- Financial Record Deletion Policy: `ON DELETE RESTRICT` is enforced on foreign keys linking `payment_attempts` and `payment_events` to `orders`. Financial records must never be cascade-deleted.
+- Order-Scoped Idempotency: Payment initialization idempotency is scoped strictly to the order (`UNIQUE(order_id, idempotency_key_hash)`), preventing cross-order collision and requiring `existingAttempt.order_id === requestedOrder.id` on replay.
+- Webhook Event Idempotency Without Assumed Event IDs: Event deduplication for `charge.success` is enforced via `UNIQUE(provider, event_type, provider_reference)` in `payment_events`, removing artificial assumptions about provider event IDs.
+- Persisted Late-Payment Operational State: When payment arrives for a cancelled order, `orders.fulfilment_status` remains `cancelled` (fail-closed), `orders.payment_status` becomes `paid` (financial truth), and `payment_attempts.resolution_status` and `payment_events.processing_status` are set to `requires_action` (`notes = 'payment_received_after_cancellation'`), ensuring the anomaly is permanently queryable in MySQL for merchant review/refund.
+- Backend Configuration Minimization: `PAYSTACK_PUBLIC_KEY` is omitted from backend requirements since server-side transaction initialization (`POST /transaction/initialize` via secret key) returns `authorization_url` and `access_code`. `PAYSTACK_SECRET_KEY` is validated with `sk_live_` in production. Detailed specifications in `docs/PAYMENTS.md` and `docs/PAYMENT_SECURITY.md`.

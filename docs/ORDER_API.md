@@ -1,6 +1,9 @@
 # Guest Order API
 
-Phase 3 provides guest checkout, token-protected confirmation, persistent email notifications, and a server-generated WhatsApp handoff URL. Customers do not authenticate or receive sessions. Online payments, customer accounts, coupons, merchant order management, and automatic WhatsApp sending remain deferred.
+Phase 3 provides guest checkout, token-protected confirmation, persistent email notifications, and a server-generated WhatsApp handoff URL. Customers do not authenticate or receive sessions.
+
+Phase 6A defines the Paystack payment security and architecture specification (see `docs/PAYMENTS.md` and `docs/PAYMENT_SECURITY.md`). Checkout and payment initialization remain strictly decoupled: orders are captured as `payment_status: unpaid` during guest checkout; payment initialization occurs subsequently against `POST /api/v1/orders/{reference}/payments`.
+
 
 ## Delivery configuration
 

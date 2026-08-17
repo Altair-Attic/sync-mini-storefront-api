@@ -506,6 +506,44 @@ attempts
 payload_hash nullable
 last_error nullable
 updated_at
+#### `payment_attempts` (Phase 6)
+
+```text
+id
+order_id foreign key (ON DELETE RESTRICT)
+provider
+internal_reference unique
+provider_reference nullable
+access_code nullable
+authorization_url nullable
+order_id + idempotency_key_hash unique
+expected_amount_kobo unsigned
+verified_amount_kobo nullable unsigned
+currency default NGN
+status
+resolution_status default none
+provider_status nullable
+channel nullable
+initiated_at
+finalized_at nullable
+created_at
+updated_at
+```
+
+#### `payment_events` (Phase 6)
+
+```text
+id
+payment_attempt_id nullable foreign key (ON DELETE RESTRICT)
+order_id nullable foreign key (ON DELETE RESTRICT)
+provider
+event_type
+provider_reference
+payload_hash
+processing_status
+processing_notes nullable
+created_at
+provider + event_type + provider_reference unique
 ```
 
 ### 12.3 Central database tables
@@ -525,21 +563,24 @@ At minimum:
 
 Keep payment and fulfilment states separate.
 
-### Payment status
+### Payment status (Order Aggregate)
 
-- `unpaid`: v1 default.
-- `pending`: Paystack initialization started.
-- `paid`: verified server-side.
-- `failed`: payment failed or expired.
-- `refunded`: verified refund completed.
+- `unpaid`: default state on order creation.
+- `pending`: active Paystack payment attempt in-flight.
+- `paid`: verified server-side via trusted webhook or S2S verification.
+- `refunded`: verified full refund completed.
+
+*(Note: Individual payment attempt statuses—`initialized`, `pending`, `successful`, `failed`, `abandoned`—are tracked on `payment_attempts` without setting the aggregate order to `failed`, allowing safe customer retries.)*
 
 ### Fulfilment status
 
 - `new`.
 - `confirmed`.
 - `processing`.
+- `ready`.
 - `completed`.
 - `cancelled`.
+
 
 Allowed fulfilment transitions must be approved by product management before implementation. Every transition must be validated and recorded in `order_status_history`.
 
@@ -980,7 +1021,19 @@ Deliverables:
 
 Exit gate: the pilot passes mobile, performance, security and recovery checks.
 
-### Phase 6 - Template expansion
+### Phase 6 - Paystack Payment Integration
+
+Duration: 6-8 working days.
+
+> Realignment Note (August 2026): Paystack payment integration was deliberately brought forward into Phase 6 to enable commercial merchant revenue capture earlier in the product lifecycle. Template expansion and central control follow payment stabilization.
+
+Deliverables:
+- Phase 6A / 6A.1: Payment security specification, threat model, state machines, and data architecture.
+- Phase 6B: Server-authoritative Paystack initialization, cryptographically verified webhooks (`X-Paystack-Signature` HMAC-SHA512), database-backed event idempotency, S2S reconciliation, and audit trail.
+
+Exit gate: zero-trust server-authoritative payment flow and full regression test suite pass.
+
+### Phase 7 - Template expansion
 
 Duration: 5-8 working days.
 
@@ -992,7 +1045,7 @@ Deliverables:
 
 Exit gate: all four templates support the same product and order features without client-specific backend branches.
 
-### Phase 7 - Central control plane
+### Phase 8 - Central control plane
 
 Duration: 7-10 working days.
 
@@ -1007,7 +1060,7 @@ Deliverables:
 
 Exit gate: the agency can see client health and lifecycle state without accessing individual merchant dashboards.
 
-### Phase 8 - Safe update pipeline
+### Phase 9 - Safe update pipeline
 
 Duration: 7-12 working days.
 
@@ -1023,19 +1076,6 @@ Deliverables:
 
 Exit gate: an update failure can be recovered without leaving a storefront offline.
 
-### Phase 9 - Paystack
-
-Later phase.
-
-Deliverables:
-
-- Merchant eligibility configuration.
-- Payment initialization.
-- Server-side verification.
-- Webhook signature validation.
-- Idempotent webhook handling.
-- Reconciliation.
-- Paid, failed and refunded states.
 
 ## 28. Team ownership
 
