@@ -37,6 +37,7 @@ return static function (HealthController $health, AuthController $auth, CurrentA
         $router->addRoute('POST', '/api/v1/admin/products', [$products, 'create']);
         $router->addRoute('GET', '/api/v1/admin/products/{id}', [$products, 'show']);
         $router->addRoute('PUT', '/api/v1/admin/products/{id}', [$products, 'update']);
+        $router->addRoute('PATCH', '/api/v1/admin/products/{id}/availability', [$products, 'updateAvailability']);
         $router->addRoute('DELETE', '/api/v1/admin/products/{id}', [$products, 'delete']);
         $router->addRoute('POST', '/api/v1/admin/products/{id}/image', [$productImages, 'upload']);
         $router->addRoute('GET', '/api/v1/admin/orders', [$orderAdmin, 'list']);

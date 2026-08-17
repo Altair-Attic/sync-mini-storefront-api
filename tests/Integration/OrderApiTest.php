@@ -179,6 +179,37 @@ final class OrderApiTest extends TestCase
         self::assertSame('IDEMPOTENCY_KEY_REQUIRED', $error['code']);
     }
 
+    public function testCheckoutRejectsUnavailableProducts(): void
+    {
+        $this->db->prepare('UPDATE products SET is_available = FALSE WHERE id = :id')->execute(['id' => $this->productId]);
+
+        $this->body = json_encode([
+            'customer_name' => 'API Contract Customer',
+            'phone_number' => '+2349035732952',
+            'customer_email' => null,
+            'fulfilment_method' => 'pickup',
+            'delivery_address' => null,
+            'state' => null,
+            'payment_method' => 'cash_on_delivery',
+            'items' => [['product_id' => $this->productPublicId, 'quantity' => 1]],
+        ], JSON_THROW_ON_ERROR);
+
+        $response = $this->application->handle([
+            'REQUEST_METHOD' => 'POST',
+            'REQUEST_URI' => '/api/v1/orders',
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_IDEMPOTENCY_KEY' => 'api-contract-idempotency-unavailable',
+            'REMOTE_ADDR' => '192.0.2.125',
+        ]);
+
+        self::assertSame(422, $response->status);
+        $error = $this->object($response->body['error'] ?? null);
+        self::assertSame('PRODUCT_UNAVAILABLE', $error['code']);
+
+        // Restore
+        $this->db->prepare('UPDATE products SET is_available = TRUE WHERE id = :id')->execute(['id' => $this->productId]);
+    }
+
     /** @return array<string, mixed> */
     private function object(mixed $value): array
     {

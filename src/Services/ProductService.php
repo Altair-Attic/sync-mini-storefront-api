@@ -118,6 +118,15 @@ final readonly class ProductService
     }
 
     /** @return array<string, mixed> */
+    public function updateAvailability(string $id, bool $isAvailable): array
+    {
+        $this->requireProduct($id);
+        $this->products->updateAvailability($id, $isAvailable);
+
+        return $this->find($id);
+    }
+
+    /** @return array<string, mixed> */
     public function deactivate(string $id): array
     {
         $this->requireProduct($id);

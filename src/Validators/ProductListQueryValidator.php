@@ -32,11 +32,11 @@ final class ProductListQueryValidator
 
     /**
      * @param array<string, mixed> $query
-     * @return array{category_id: string|null, status: string, search: string|null, page: int, per_page: int, sort: string}
+     * @return array{category_id: string|null, status: string, availability: string, search: string|null, page: int, per_page: int, sort: string}
      */
     public function adminQuery(array $query): array
     {
-        $errors = $this->unknown($query, ['category_id', 'status', 'search', 'page', 'per_page', 'sort']);
+        $errors = $this->unknown($query, ['category_id', 'status', 'availability', 'search', 'page', 'per_page', 'sort']);
         $categoryId = $this->optionalString($query['category_id'] ?? null);
         if ($categoryId === false || (is_string($categoryId) && preg_match('/^[0-9a-f-]{36}$/i', $categoryId) !== 1)) {
             $errors['category_id'] = ['Enter a valid category UUID.'];
@@ -44,6 +44,10 @@ final class ProductListQueryValidator
         $status = $query['status'] ?? 'all';
         if (!is_string($status) || !in_array($status, ['active', 'inactive', 'all'], true)) {
             $errors['status'] = ['Use active, inactive, or all.'];
+        }
+        $availability = $query['availability'] ?? 'all';
+        if (!is_string($availability) || !in_array($availability, ['available', 'unavailable', 'all'], true)) {
+            $errors['availability'] = ['Use available, unavailable, or all.'];
         }
         $search = $this->optionalString($query['search'] ?? null);
         if ($search === false || (is_string($search) && mb_strlen($search) > 160)) {
@@ -57,6 +61,7 @@ final class ProductListQueryValidator
         return [
             'category_id' => is_string($categoryId) ? strtolower($categoryId) : null,
             'status' => is_string($status) ? $status : 'all',
+            'availability' => is_string($availability) ? $availability : 'all',
             'search' => is_string($search) ? $search : null,
             'page' => $page,
             'per_page' => $perPage,

@@ -64,7 +64,7 @@ final readonly class CheckoutService
         $subtotal = 0;
         foreach ($request['items'] as $item) {
             $product = $productMap[$item['product_id']] ?? null;
-            if ($product === null || !$product['is_active']) {
+            if ($product === null || !$product['is_active'] || !$product['is_available']) {
                 throw new CheckoutException('PRODUCT_UNAVAILABLE', 'One or more products are unavailable.', 422);
             }
             $lineTotal = $this->multiply($product['price_kobo'], $item['quantity']);

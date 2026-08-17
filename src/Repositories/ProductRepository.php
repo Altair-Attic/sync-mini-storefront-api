@@ -28,7 +28,7 @@ final readonly class ProductRepository
         }
         $joins = ' LEFT JOIN categories c ON c.id = p.category_id';
         $count = $this->count('products p' . $joins, $where, $parameters);
-        $sql = 'SELECT p.public_id, p.slug, p.title, p.description, p.price_kobo, p.image_url, p.display_order, '
+        $sql = 'SELECT p.public_id, p.slug, p.title, p.description, p.price_kobo, p.is_available, p.image_url, p.display_order, '
             . '(SELECT currency FROM business_profiles LIMIT 1) AS currency, '
             . 'CASE WHEN c.is_active = TRUE THEN c.public_id ELSE NULL END AS category_public_id, '
             . 'CASE WHEN c.is_active = TRUE THEN c.name ELSE NULL END AS category_name, '
@@ -45,7 +45,7 @@ final readonly class ProductRepository
     public function findPublicBySlug(string $slug): ?array
     {
         $statement = $this->db->prepare(
-            'SELECT p.public_id, p.slug, p.title, p.description, p.price_kobo, p.image_url, p.display_order, '
+            'SELECT p.public_id, p.slug, p.title, p.description, p.price_kobo, p.is_available, p.image_url, p.display_order, '
             . '(SELECT currency FROM business_profiles LIMIT 1) AS currency, '
             . 'CASE WHEN c.is_active = TRUE THEN c.public_id ELSE NULL END AS category_public_id, '
             . 'CASE WHEN c.is_active = TRUE THEN c.name ELSE NULL END AS category_name, '
@@ -63,7 +63,7 @@ final readonly class ProductRepository
      * the service can reject the entire cart without disclosing which condition failed.
      *
      * @param list<string> $publicIds
-     * @return list<array{id: string, public_id: string, slug: string, title: string, price_kobo: int, is_active: bool}>
+     * @return list<array{id: string, public_id: string, slug: string, title: string, price_kobo: int, is_active: bool, is_available: bool}>
      */
     public function findForCheckout(array $publicIds): array
     {
@@ -78,7 +78,7 @@ final readonly class ProductRepository
             $parameters[$name] = $publicId;
         }
         $statement = $this->db->prepare(
-            'SELECT id, public_id, slug, title, price_kobo, is_active FROM products WHERE public_id IN ('
+            'SELECT id, public_id, slug, title, price_kobo, is_active, is_available FROM products WHERE public_id IN ('
             . implode(', ', $placeholders) . ')'
         );
         $statement->execute($parameters);
@@ -94,6 +94,7 @@ final readonly class ProductRepository
                 'title' => $this->string($row, 'title'),
                 'price_kobo' => $this->integer($row, 'price_kobo'),
                 'is_active' => $this->boolean($row, 'is_active'),
+                'is_available' => $this->boolean($row, 'is_available'),
             ];
         }
 
@@ -101,7 +102,7 @@ final readonly class ProductRepository
     }
 
     /**
-     * @param array{category_id: string|null, status: string, search: string|null, page: int, per_page: int, sort: string} $query
+     * @param array{category_id: string|null, status: string, availability: string, search: string|null, page: int, per_page: int, sort: string} $query
      * @return array{items: list<array<string, mixed>>, total: int}
      */
     public function adminList(array $query): array
@@ -116,6 +117,10 @@ final readonly class ProductRepository
             $where[] = 'p.is_active = :is_active';
             $parameters['is_active'] = $query['status'] === 'active' ? 1 : 0;
         }
+        if ($query['availability'] !== 'all') {
+            $where[] = 'p.is_available = :is_available';
+            $parameters['is_available'] = $query['availability'] === 'available' ? 1 : 0;
+        }
         if ($query['search'] !== null) {
             $where[] = '(p.title LIKE :search OR p.slug LIKE :search)';
             $parameters['search'] = '%' . $query['search'] . '%';
@@ -123,7 +128,7 @@ final readonly class ProductRepository
         $joins = ' LEFT JOIN categories c ON c.id = p.category_id';
         $count = $this->count('products p' . $joins, $where, $parameters);
         $statement = $this->db->prepare(
-            'SELECT p.id, p.public_id, p.category_id, p.slug, p.title, p.description, p.price_kobo, p.image_url, p.is_active, p.display_order, p.created_at, p.updated_at, '
+            'SELECT p.id, p.public_id, p.category_id, p.slug, p.title, p.description, p.price_kobo, p.image_url, p.is_active, p.is_available, p.display_order, p.created_at, p.updated_at, '
             . 'c.public_id AS category_public_id, c.name AS category_name, c.slug AS category_slug, c.is_active AS category_is_active '
             . 'FROM products p' . $joins . ' WHERE ' . implode(' AND ', $where)
             . ' ORDER BY ' . $this->orderBy($query['sort']) . ' LIMIT :limit OFFSET :offset'
@@ -137,7 +142,7 @@ final readonly class ProductRepository
     public function find(string $id): ?array
     {
         $statement = $this->db->prepare(
-            'SELECT p.id, p.public_id, p.category_id, p.slug, p.title, p.description, p.price_kobo, p.image_url, p.is_active, p.display_order, p.created_at, p.updated_at, '
+            'SELECT p.id, p.public_id, p.category_id, p.slug, p.title, p.description, p.price_kobo, p.image_url, p.is_active, p.is_available, p.display_order, p.created_at, p.updated_at, '
             . 'c.public_id AS category_public_id, c.name AS category_name, c.slug AS category_slug, c.is_active AS category_is_active '
             . 'FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = :id LIMIT 1'
         );
@@ -161,18 +166,24 @@ final readonly class ProductRepository
         return $statement->fetchColumn() !== false;
     }
 
-    /** @param array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, display_order: int} $product */
+    /** @param array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, is_available: bool, display_order: int} $product */
     public function create(string $id, string $publicId, array $product): void
     {
-        $statement = $this->db->prepare('INSERT INTO products (id, public_id, category_id, slug, title, description, price_kobo, image_url, is_active, display_order, created_at, updated_at) VALUES (:id, :public_id, :category_id, :slug, :title, :description, :price_kobo, :image_url, :is_active, :display_order, UTC_TIMESTAMP(), UTC_TIMESTAMP())');
+        $statement = $this->db->prepare('INSERT INTO products (id, public_id, category_id, slug, title, description, price_kobo, image_url, is_active, is_available, display_order, created_at, updated_at) VALUES (:id, :public_id, :category_id, :slug, :title, :description, :price_kobo, :image_url, :is_active, :is_available, :display_order, UTC_TIMESTAMP(), UTC_TIMESTAMP())');
         $statement->execute(['id' => $id, 'public_id' => $publicId] + $this->parameters($product));
     }
 
-    /** @param array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, display_order: int} $product */
+    /** @param array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, is_available: bool, display_order: int} $product */
     public function update(string $id, array $product): void
     {
-        $statement = $this->db->prepare('UPDATE products SET category_id = :category_id, slug = :slug, title = :title, description = :description, price_kobo = :price_kobo, image_url = :image_url, is_active = :is_active, display_order = :display_order, updated_at = UTC_TIMESTAMP() WHERE id = :id');
+        $statement = $this->db->prepare('UPDATE products SET category_id = :category_id, slug = :slug, title = :title, description = :description, price_kobo = :price_kobo, image_url = :image_url, is_active = :is_active, is_available = :is_available, display_order = :display_order, updated_at = UTC_TIMESTAMP() WHERE id = :id');
         $statement->execute($this->parameters($product) + ['id' => $id]);
+    }
+
+    public function updateAvailability(string $id, bool $isAvailable): void
+    {
+        $statement = $this->db->prepare('UPDATE products SET is_available = :is_available, updated_at = UTC_TIMESTAMP() WHERE id = :id');
+        $statement->execute(['is_available' => $isAvailable ? 1 : 0, 'id' => $id]);
     }
 
     public function updateImage(string $id, string $imageUrl): void
@@ -188,7 +199,7 @@ final readonly class ProductRepository
     }
 
     /**
-     * @param array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, display_order: int} $product
+     * @param array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, is_available: bool, display_order: int} $product
      * @return array<string, int|string|null>
      */
     private function parameters(array $product): array
@@ -201,6 +212,7 @@ final readonly class ProductRepository
             'price_kobo' => $product['price_kobo'],
             'image_url' => $product['image_url'],
             'is_active' => $product['is_active'] ? 1 : 0,
+            'is_available' => $product['is_available'] ? 1 : 0,
             'display_order' => $product['display_order'],
         ];
     }
@@ -269,6 +281,7 @@ final readonly class ProductRepository
             'price_kobo' => $this->integer($row, 'price_kobo'),
             'currency' => $this->string($row, 'currency'),
             'image_url' => $this->nullable($row, 'image_url'),
+            'is_available' => $this->boolean($row, 'is_available'),
             'display_order' => $this->integer($row, 'display_order'),
             'category' => $categoryPublicId === null ? null : [
                 'public_id' => $categoryPublicId,
@@ -296,6 +309,7 @@ final readonly class ProductRepository
             'price_kobo' => $this->integer($row, 'price_kobo'),
             'image_url' => $this->nullable($row, 'image_url'),
             'is_active' => $this->boolean($row, 'is_active'),
+            'is_available' => $this->boolean($row, 'is_available'),
             'display_order' => $this->integer($row, 'display_order'),
             'category' => $categoryId === null ? null : [
                 'public_id' => $this->nullable($row, 'category_public_id'),

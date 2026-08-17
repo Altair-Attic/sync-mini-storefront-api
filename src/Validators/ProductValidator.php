@@ -9,14 +9,14 @@ use ProjectSync\Exceptions\ValidationException;
 final class ProductValidator
 {
     /** @var list<string> */
-    private const array FIELDS = ['category_id', 'slug', 'title', 'description', 'price_kobo', 'image_url', 'is_active', 'display_order'];
+    private const array FIELDS = ['category_id', 'slug', 'title', 'description', 'price_kobo', 'image_url', 'is_active', 'is_available', 'display_order'];
 
     /** @var list<string> */
     private const array IMMUTABLE = ['id', 'public_id', 'created_at', 'updated_at', 'currency'];
 
     /**
      * @param array<string, mixed> $input
-     * @return array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, display_order: int}
+     * @return array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, is_available: bool, display_order: int}
      */
     public function validate(array $input): array
     {
@@ -60,6 +60,12 @@ final class ProductValidator
         $isActive = $input['is_active'] ?? true;
         if (!is_bool($isActive)) {
             $errors['is_active'] = ['Enter true or false.'];
+            $isActive = true;
+        }
+        $isAvailable = $input['is_available'] ?? true;
+        if (!is_bool($isAvailable)) {
+            $errors['is_available'] = ['Enter true or false.'];
+            $isAvailable = true;
         }
         $displayOrder = $input['display_order'] ?? 0;
         if (!is_int($displayOrder) || $displayOrder < 0) {
@@ -78,6 +84,7 @@ final class ProductValidator
             'price_kobo' => $price,
             'image_url' => is_string($imageUrl) ? $imageUrl : null,
             'is_active' => $isActive,
+            'is_available' => $isAvailable,
             'display_order' => $displayOrder,
         ];
     }

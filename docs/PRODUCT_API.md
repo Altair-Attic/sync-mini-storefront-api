@@ -4,7 +4,7 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
 
 ## Public endpoints
 
-`GET /api/v1/products` is unauthenticated and supports `category`, `page`, `per_page`, and `sort`. Page defaults to 1, `per_page` to 20 (maximum 100), and sort to `display_order`. Sort values are `display_order`, `title`, `price_low`, `price_high`, and `newest`. An unknown or inactive category produces an empty page. Every result is active; inactive category information is represented as `category: null`.
+`GET /api/v1/products` is unauthenticated and supports `category`, `page`, `per_page`, and `sort`. Page defaults to 1, `per_page` to 20 (maximum 100), and sort to `display_order`. Sort values are `display_order`, `title`, `price_low`, `price_high`, and `newest`. An unknown or inactive category produces an empty page. Every result is active (`is_active = TRUE`); inactive category information is represented as `category: null`. The `is_available` boolean indicates whether customers can order the item (active but unavailable items remain visible with `is_available: false`).
 
 ```json
 {
@@ -17,6 +17,7 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
     "price_kobo": 250000,
     "currency": "NGN",
     "image_url": "/uploads/products/generated.webp",
+    "is_available": true,
     "display_order": 0,
     "category": null
   }],
@@ -24,24 +25,27 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
 }
 ```
 
-`GET /api/v1/products/{slug}` returns one active product using the same safe fields. Unknown or inactive records return `404 PRODUCT_NOT_FOUND`. Public responses never contain internal IDs, activity flags, or timestamps.
+`GET /api/v1/products/{slug}` returns one active product using the same safe fields. Unknown or inactive records return `404 PRODUCT_NOT_FOUND`. Active records with `is_available: false` return 200 with `is_available: false`. Public responses never contain internal IDs, activity flags, or timestamps.
 
 ## Admin endpoints
 
 | Method | Path | Authentication | Content type |
 |---|---|---|---|
-| GET | `/api/v1/admin/products` | No | — |
-| POST | `/api/v1/admin/products` | Yes | `application/json` |
-| GET | `/api/v1/admin/products/{id}` | No | — |
-| PUT | `/api/v1/admin/products/{id}` | Yes | `application/json` |
-| DELETE | `/api/v1/admin/products/{id}` | Yes | — |
-| POST | `/api/v1/admin/products/{id}/image` | Yes | `multipart/form-data` (`image`) |
+| GET | `/api/v1/admin/products` | Bearer JWT | — |
+| POST | `/api/v1/admin/products` | Bearer JWT | `application/json` |
+| GET | `/api/v1/admin/products/{id}` | Bearer JWT | — |
+| PUT | `/api/v1/admin/products/{id}` | Bearer JWT | `application/json` |
+| PATCH | `/api/v1/admin/products/{id}/availability` | Bearer JWT | `application/json` |
+| DELETE | `/api/v1/admin/products/{id}` | Bearer JWT | — |
+| POST | `/api/v1/admin/products/{id}/image` | Bearer JWT | `multipart/form-data` (`image`) |
 
-All admin endpoints require an administrator JWT in `Authorization: Bearer <access-token>`. Listing supports `category_id`, `status=active|inactive|all` (default `all`), bounded `search`, the public pagination fields, and all public sort modes.
+All admin endpoints require an administrator JWT in `Authorization: Bearer <access-token>`. Listing supports `category_id`, `status=active|inactive|all` (default `all`), `availability=available|unavailable|all` (default `all`), bounded `search`, the public pagination fields, and all public sort modes.
 
-POST and PUT are full representations. `category_id` is nullable and must identify an active category when assigning or changing the assignment. Existing assignments survive category deactivation. `slug` may be generated from `title`, which is trimmed and 2–160 characters. `description` is nullable and limited to 10,000 characters. `price_kobo` must be a JSON integer at least zero. `image_url` is nullable and must be HTTPS or an application-managed absolute path. `is_active` is boolean and `display_order` is a non-negative integer. Unknown fields and immutable `id`, `public_id`, `created_at`, `updated_at`, and `currency` are rejected.
+POST and PUT are full representations. `category_id` is nullable and must identify an active category when assigning or changing the assignment. Existing assignments survive category deactivation. `slug` may be generated from `title`, which is trimmed and 2–160 characters. `description` is nullable and limited to 10,000 characters. `price_kobo` must be a JSON integer at least zero. `image_url` is nullable and must be HTTPS or an application-managed absolute path. `is_active` is boolean (default true), `is_available` is boolean (default true), and `display_order` is a non-negative integer. Unknown fields and immutable `id`, `public_id`, `created_at`, `updated_at`, and `currency` are rejected.
 
-DELETE is repeatable deactivation and never hard-deletes. Catalogue changes are independent of future immutable order-item snapshots.
+`PATCH /api/v1/admin/products/{id}/availability` accepts `{"available": boolean}` or `{"is_available": boolean}` to mutate ordering availability quickly without submitting a complete representation.
+
+DELETE is repeatable deactivation and sets `is_active=false`; it never hard-deletes. Catalogue changes are independent of future immutable order-item snapshots.
 
 ## Product images
 

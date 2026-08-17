@@ -44,9 +44,17 @@ final class CatalogueMigrationTest extends TestCase
     {
         $runner = new MigrationRunner($this->db, dirname(__DIR__, 2) . '/database/migrations');
         self::assertSame([], $runner->run());
-        $statement = $this->db->prepare('SELECT migration FROM schema_migrations WHERE migration IN (:category, :product) ORDER BY migration');
-        $statement->execute(['category' => '202608130005_create_categories_table', 'product' => '202608130006_create_products_table']);
-        self::assertSame(['202608130005_create_categories_table', '202608130006_create_products_table'], $statement->fetchAll(PDO::FETCH_COLUMN));
+        $statement = $this->db->prepare('SELECT migration FROM schema_migrations WHERE migration IN (:category, :product, :availability) ORDER BY migration');
+        $statement->execute([
+            'category' => '202608130005_create_categories_table',
+            'product' => '202608130006_create_products_table',
+            'availability' => '202608170015_add_is_available_to_products',
+        ]);
+        self::assertSame([
+            '202608130005_create_categories_table',
+            '202608130006_create_products_table',
+            '202608170015_add_is_available_to_products',
+        ], $statement->fetchAll(PDO::FETCH_COLUMN));
     }
 
     public function testUniqueSlugsPublicIdsIndexesAndForeignKeyBehavior(): void
@@ -64,9 +72,14 @@ final class CatalogueMigrationTest extends TestCase
         $indexes = $this->db->prepare("SELECT TABLE_NAME, INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('categories', 'products')");
         $indexes->execute();
         $names = array_column($indexes->fetchAll(PDO::FETCH_ASSOC), 'INDEX_NAME');
-        foreach (['uq_categories_public_id', 'uq_categories_slug', 'idx_categories_active_order_name', 'uq_products_public_id', 'uq_products_slug', 'idx_products_public_listing', 'idx_products_category_listing', 'idx_products_admin_status'] as $name) {
+        foreach (['uq_categories_public_id', 'uq_categories_slug', 'idx_categories_active_order_name', 'uq_products_public_id', 'uq_products_slug', 'idx_products_public_listing', 'idx_products_category_listing', 'idx_products_admin_status', 'idx_products_admin_availability'] as $name) {
             self::assertContains($name, $names);
         }
+
+        $columns = $this->db->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products'");
+        $columns->execute();
+        $columnNames = array_column($columns->fetchAll(PDO::FETCH_ASSOC), 'COLUMN_NAME');
+        self::assertContains('is_available', $columnNames);
     }
 
     public function testUniqueCategoryAndProductValuesAreEnforced(): void

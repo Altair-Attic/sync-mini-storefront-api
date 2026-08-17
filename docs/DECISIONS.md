@@ -46,3 +46,15 @@ Status: approved for MVP.
 - Same-status mutations are idempotent (`unchanged: true` / `meta.idempotent_replay: true`), generating no duplicate history entries and no duplicate notification jobs.
 - All valid status transitions append audit records to `order_status_history`, recording `previous_status`, `new_status`, `changed_by` admin user ID, and timestamp.
 - Customer notification jobs for order status updates are enqueued asynchronously in the persistent notification queue; order state changes commit independently of email transport delivery.
+
+## 2026-08-17 — Phase 5 Product availability and catalogue operations
+
+Status: approved for MVP.
+
+- Canonical product availability uses two decoupled boolean flags:
+  - `is_active`: Controls presence in the public storefront catalogue. Inactive products (`is_active = FALSE`) are completely hidden from public listings and slug lookup (`404 PRODUCT_NOT_FOUND`).
+  - `is_available`: Controls whether an active product can be ordered. Active but unavailable products (`is_active = TRUE`, `is_available = FALSE`) remain visible in public catalogue listings with `"is_available": false`, but cannot be purchased.
+- Checkout availability enforcement: Every product in a submitted cart is revalidated at checkout against the current database state. If any item is missing, inactive, or unavailable (`is_available = FALSE`), checkout rejects the entire cart with `422 PRODUCT_UNAVAILABLE` and creates zero order records.
+- Server-side pricing: Unit prices and totals are strictly calculated from current database values; client-submitted totals or unit prices are never trusted or accepted. Order item snapshots in `order_items` preserve checkout-time pricing and titles immutably.
+- Category rules: Products can only be assigned to existing, active categories. Deactivating a category preserves historical product assignments, but public product responses display `category: null`.
+- Admin endpoints require Bearer JWT authentication and support product CRUD, bounded listing with `status`, `availability`, `category_id`, and `search` filters, and dedicated availability toggling via `PATCH /api/v1/admin/products/{id}/availability`.

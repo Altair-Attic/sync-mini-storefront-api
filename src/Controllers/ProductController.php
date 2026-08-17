@@ -108,6 +108,52 @@ final readonly class ProductController
      * @param array<string, mixed> $server
      * @param array<string, string> $route
      */
+    public function updateAvailability(string $requestId, array $server, array $route): HttpResponse
+    {
+        $failure = $this->authenticate($requestId, $server);
+        if ($failure !== null) {
+            return $failure;
+        }
+        if (!RequestParser::isContentType($server, 'application/json')) {
+            return JsonResponse::error('UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json.', $requestId, 415);
+        }
+        try {
+            $payload = RequestParser::jsonObject(($this->readBody)());
+            $available = null;
+            $errors = [];
+            foreach ($payload as $key => $value) {
+                if ($key === 'available' || $key === 'is_available') {
+                    if (!is_bool($value)) {
+                        $errors[$key] = ['Enter true or false.'];
+                    } else {
+                        $available = $value;
+                    }
+                } else {
+                    $errors[$key] = ['Unknown field.'];
+                }
+            }
+            if ($available === null && !isset($errors['available']) && !isset($errors['is_available'])) {
+                $errors['available'] = ['The available field is required.'];
+            }
+            if ($errors !== []) {
+                throw new ValidationException($errors);
+            }
+            $product = $this->products->updateAvailability($route['id'] ?? '', (bool) $available);
+
+            return JsonResponse::success($product, $requestId, 200);
+        } catch (JsonException|ValidationException $exception) {
+            $fields = $exception instanceof ValidationException ? $exception->fields : [];
+
+            return JsonResponse::error('VALIDATION_FAILED', 'Check the highlighted fields.', $requestId, 422, $fields);
+        } catch (ProductNotFoundException) {
+            return $this->notFound($requestId);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $server
+     * @param array<string, string> $route
+     */
     public function delete(string $requestId, array $server, array $route): HttpResponse
     {
         $failure = $this->authenticate($requestId, $server);

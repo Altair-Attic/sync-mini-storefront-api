@@ -58,6 +58,7 @@ paths:
       parameters:
         - {name: category_id, in: query, schema: {type: string, format: uuid}}
         - {name: status, in: query, schema: {type: string, enum: [active, inactive, all], default: all}}
+        - {name: availability, in: query, schema: {type: string, enum: [available, unavailable, all], default: all}}
         - {name: search, in: query, schema: {type: string, maxLength: 160}}
         - {$ref: '#/components/parameters/Page'}
         - {$ref: '#/components/parameters/PerPage'}
@@ -83,6 +84,13 @@ paths:
       summary: Deactivate a product
       security: [{bearerAuth: []}]
       responses: {'200': {description: Deactivated}, '404': {description: PRODUCT_NOT_FOUND}}
+  /api/v1/admin/products/{id}/availability:
+    parameters: [{$ref: '#/components/parameters/InternalId'}]
+    patch:
+      summary: Mutate product ordering availability
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProductAvailabilityInput'}}}}
+      responses: {'200': {description: Updated product}, '401': {$ref: '#/components/responses/Unauthenticated'}, '404': {description: PRODUCT_NOT_FOUND}, '422': {$ref: '#/components/responses/ValidationFailed'}}
   /api/v1/admin/products/{id}/image:
     parameters: [{$ref: '#/components/parameters/InternalId'}]
     post:
@@ -125,7 +133,14 @@ components:
         price_kobo: {type: integer, minimum: 0}
         image_url: {type: [string, 'null']}
         is_active: {type: boolean, default: true}
+        is_available: {type: boolean, default: true}
         display_order: {type: integer, minimum: 0, default: 0}
+    ProductAvailabilityInput:
+      type: object
+      additionalProperties: false
+      properties:
+        available: {type: boolean}
+        is_available: {type: boolean}
     CategoryListResponse:
       type: object
       required: [success, data, meta]

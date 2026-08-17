@@ -19,6 +19,11 @@ final class ProductValidatorTest extends TestCase
         self::assertSame('ankara-bag', $result['slug']);
         self::assertSame(250000, $result['price_kobo']);
         self::assertNull($result['category_id']);
+        self::assertTrue($result['is_active']);
+        self::assertTrue($result['is_available']);
+
+        $explicit = (new ProductValidator())->validate(['title' => 'Unavailable Bag', 'price_kobo' => 100000, 'is_available' => false]);
+        self::assertFalse($explicit['is_available']);
     }
 
     #[DataProvider('invalidFields')]
@@ -43,6 +48,8 @@ final class ProductValidatorTest extends TestCase
         yield 'insecure image URL' => ['image_url', 'http://example.com/image.png'];
         yield 'traversal image path' => ['image_url', '/uploads/../secret'];
         yield 'invalid slug' => ['slug', 'Bad Slug'];
+        yield 'non-bool is_active' => ['is_active', 'yes'];
+        yield 'non-bool is_available' => ['is_available', 'no'];
         yield 'unknown field' => ['stock', 4];
         yield 'immutable currency' => ['currency', 'NGN'];
     }
@@ -83,5 +90,39 @@ final class ProductValidatorTest extends TestCase
         yield 'bad sort' => [['sort' => 'random'], 'sort'];
         yield 'bad category' => [['category' => 'Bad Slug'], 'category'];
         yield 'unknown filter' => [['currency' => 'NGN'], 'currency'];
+    }
+
+    public function testAdminQueryAcceptsAvailabilityAndStatusFilters(): void
+    {
+        $validator = new ProductListQueryValidator();
+        $query = $validator->adminQuery(['availability' => 'unavailable', 'status' => 'active']);
+        self::assertSame('unavailable', $query['availability']);
+        self::assertSame('active', $query['status']);
+
+        $defaultQuery = $validator->adminQuery([]);
+        self::assertSame('all', $defaultQuery['availability']);
+        self::assertSame('all', $defaultQuery['status']);
+    }
+
+    /** @param array<string, mixed> $query */
+    #[DataProvider('invalidAdminQueries')]
+    public function testInvalidAdminListQueriesAreRejected(array $query, string $field): void
+    {
+        try {
+            (new ProductListQueryValidator())->adminQuery($query);
+            self::fail('ValidationException was not thrown.');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey($field, $exception->fields);
+        }
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string}> */
+    public static function invalidAdminQueries(): iterable
+    {
+        yield 'bad availability' => [['availability' => 'in_stock'], 'availability'];
+        yield 'bad status' => [['status' => 'archived'], 'status'];
+        yield 'bad category id' => [['category_id' => 'not-a-uuid'], 'category_id'];
+        yield 'oversize search' => [['search' => str_repeat('a', 161)], 'search'];
+        yield 'unknown admin filter' => [['tags' => 'food'], 'tags'];
     }
 }

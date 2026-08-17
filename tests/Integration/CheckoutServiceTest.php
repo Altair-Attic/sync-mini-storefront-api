@@ -113,13 +113,30 @@ final class CheckoutServiceTest extends TestCase
         self::assertSame(0, $pickup->order['delivery_fee_kobo']);
         self::assertSame(500000, $pickup->order['total_kobo']);
 
+        // Inactive product rejected
         $this->db->prepare('UPDATE products SET is_active = FALSE WHERE id = :id')->execute(['id' => $this->productId]);
         try {
             $this->checkout->create($this->request('pickup'), 'checkout-test-key-000003');
             self::fail('Expected inactive product rejection.');
         } catch (CheckoutException $exception) {
             self::assertSame('PRODUCT_UNAVAILABLE', $exception->errorCode);
+            self::assertSame(422, $exception->status);
         }
+
+        // Active but unavailable product rejected
+        $this->db->prepare('UPDATE products SET is_active = TRUE, is_available = FALSE WHERE id = :id')->execute(['id' => $this->productId]);
+        try {
+            $this->checkout->create($this->request('pickup'), 'checkout-test-key-000003b');
+            self::fail('Expected unavailable product rejection.');
+        } catch (CheckoutException $exception) {
+            self::assertSame('PRODUCT_UNAVAILABLE', $exception->errorCode);
+            self::assertSame(422, $exception->status);
+        }
+
+        // Re-enabling availability immediately allows ordering again
+        $this->db->prepare('UPDATE products SET is_available = TRUE WHERE id = :id')->execute(['id' => $this->productId]);
+        $reordered = $this->checkout->create($this->request('pickup'), 'checkout-test-key-000003c');
+        self::assertSame(500000, $reordered->order['total_kobo']);
     }
 
     public function testChangedRequestConflictsAndWrongConfirmationTokenLooksMissing(): void
