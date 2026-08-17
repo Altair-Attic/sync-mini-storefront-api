@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Project Sync Guest Order API
+  title: Project Sync Order API
   version: 1.0.0
 paths:
   /api/v1/orders:
@@ -40,7 +40,103 @@ paths:
         '200': { description: Confirmation summary, content: { application/json: { schema: { $ref: '#/components/schemas/ConfirmationResponse' } } } }
         '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
+  /api/v1/admin/orders:
+    get:
+      summary: List merchant store orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: status
+          schema: { type: string, enum: [new, confirmed, processing, ready, completed, cancelled] }
+        - in: query
+          name: search
+          schema: { type: string, maxLength: 100 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [newest, oldest, total_high, total_low], default: newest }
+        - in: query
+          name: date_from
+          schema: { type: string }
+        - in: query
+          name: date_to
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated order list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminOrderListResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /api/v1/admin/orders/summary:
+    get:
+      summary: Summary counts of merchant orders by status
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Order counts summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminOrderSummaryResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+  /api/v1/admin/orders/{id}:
+    get:
+      summary: Get complete merchant order details
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Complete merchant order details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminOrderDetailResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/admin/orders/{id}/status:
+    patch:
+      summary: Update order fulfilment status
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminOrderStatusUpdateRequest' }
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminOrderDetailResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     CheckoutRequest:
       type: object
@@ -68,12 +164,24 @@ components:
     OrderItem:
       type: object
       properties:
+        id: { type: string }
+        order_id: { type: string }
+        product_id: { type: [string, 'null'] }
         product_public_id: { type: string, format: uuid }
         product_title: { type: string }
         product_slug: { type: string }
         unit_price_kobo: { type: integer, minimum: 0 }
         quantity: { type: integer, minimum: 1 }
         line_total_kobo: { type: integer, minimum: 0 }
+        created_at: { type: string }
+    OrderStatusHistory:
+      type: object
+      properties:
+        id: { type: string }
+        previous_status: { type: [string, 'null'] }
+        new_status: { type: string }
+        changed_by: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
     Order:
       type: object
       properties:
@@ -88,7 +196,7 @@ components:
         currency: { type: string, const: NGN }
         payment_method: { type: string, const: cash_on_delivery }
         payment_status: { type: string, const: unpaid }
-        fulfilment_status: { type: string, const: new }
+        fulfilment_status: { type: string }
         items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
         created_at: { type: string, format: date-time }
         whatsapp_url: { type: [string, 'null'], format: uri }
@@ -99,6 +207,39 @@ components:
           properties:
             merchant_email: { type: string, enum: [sent, queued, skipped] }
             customer_email: { type: string, enum: [sent, queued, skipped] }
+    AdminOrderSummary:
+      type: object
+      properties:
+        id: { type: string }
+        reference: { type: string }
+        customer_name: { type: string }
+        phone_number: { type: string }
+        customer_email: { type: [string, 'null'] }
+        fulfilment_method: { type: string }
+        delivery_address: { type: [string, 'null'] }
+        state: { type: [string, 'null'] }
+        subtotal_kobo: { type: integer }
+        delivery_fee_kobo: { type: integer }
+        total_kobo: { type: integer }
+        currency: { type: string }
+        payment_method: { type: string }
+        payment_status: { type: string }
+        fulfilment_status: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AdminOrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/AdminOrderSummary'
+        - type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+            status_history: { type: array, items: { $ref: '#/components/schemas/OrderStatusHistory' } }
+    AdminOrderStatusUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, enum: [new, confirmed, processing, ready, completed, cancelled] }
     OrderResponse:
       type: object
       required: [success, data, meta]
@@ -119,6 +260,49 @@ components:
       properties:
         success: { type: boolean, const: true }
         data: { $ref: '#/components/schemas/Order' }
+        meta: { type: object, properties: { request_id: { type: string } } }
+    AdminOrderListResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, const: true }
+        data: { type: array, items: { $ref: '#/components/schemas/AdminOrderSummary' } }
+        meta:
+          type: object
+          required: [page, per_page, total, total_pages, request_id]
+          properties:
+            page: { type: integer }
+            per_page: { type: integer }
+            total: { type: integer }
+            total_pages: { type: integer }
+            request_id: { type: string }
+    AdminOrderDetailResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: object
+          required: [order]
+          properties:
+            order: { $ref: '#/components/schemas/AdminOrderDetail' }
+        meta:
+          type: object
+          properties:
+            request_id: { type: string }
+            idempotent_replay: { type: boolean }
+    AdminOrderSummaryResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: object
+          required: [summary]
+          properties:
+            summary:
+              type: object
+              additionalProperties: { type: integer }
         meta: { type: object, properties: { request_id: { type: string } } }
     Error:
       type: object

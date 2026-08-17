@@ -29,7 +29,7 @@ try {
 } catch (\PDOException) {
     fwrite(STDERR, sprintf("Migration failed: the database connection could not be established.%s", PHP_EOL));
     exit(1);
-} catch (\Throwable) {
-    fwrite(STDERR, sprintf("Migration failed. Review the application log for details.%s", PHP_EOL));
+} catch (\Throwable $e) {
+    fwrite(STDERR, sprintf("Migration failed: %s (Caused by: %s)%s", $e->getMessage(), $e->getPrevious()?->getMessage() ?? 'none', PHP_EOL));
     exit(1);
 }

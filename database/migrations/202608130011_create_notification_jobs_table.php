@@ -8,7 +8,7 @@ return static function (PDO $db): void {
         . 'id CHAR(36) NOT NULL PRIMARY KEY,'
         . 'order_id CHAR(36) NOT NULL,'
         . 'channel VARCHAR(16) NOT NULL,'
-        . 'recipient_type VARCHAR(16) NOT NULL,'
+        . 'recipient_type VARCHAR(32) NOT NULL,'
         . 'recipient_hash CHAR(64) NULL,'
         . 'status VARCHAR(16) NOT NULL,'
         . 'attempts INT UNSIGNED NOT NULL DEFAULT 0,'

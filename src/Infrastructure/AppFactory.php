@@ -13,6 +13,7 @@ use ProjectSync\Controllers\OrderController;
 use ProjectSync\Controllers\OrderConfirmationController;
 use ProjectSync\Controllers\Admin\AuthController;
 use ProjectSync\Controllers\Admin\CurrentAdminController;
+use ProjectSync\Controllers\Admin\OrderManagementController;
 use ProjectSync\Infrastructure\Auth\JwtService;
 use ProjectSync\Infrastructure\Auth\RefreshCookie;
 use ProjectSync\Infrastructure\Auth\SameOriginPolicy;
@@ -28,6 +29,7 @@ use ProjectSync\Repositories\ProductRepository;
 use ProjectSync\Repositories\MerchantUserRepository;
 use ProjectSync\Repositories\OrderItemRepository;
 use ProjectSync\Repositories\OrderRepository;
+use ProjectSync\Repositories\OrderStatusHistoryRepository;
 use ProjectSync\Services\AuthenticationService;
 use ProjectSync\Services\LoginRateLimiter;
 use ProjectSync\Services\BusinessProfileService;
@@ -36,11 +38,14 @@ use ProjectSync\Services\ProductImageService;
 use ProjectSync\Services\ProductService;
 use ProjectSync\Services\CheckoutRateLimiter;
 use ProjectSync\Services\CheckoutService;
+use ProjectSync\Services\OrderManagementService;
 use ProjectSync\Services\OrderConfirmationTokenService;
 use ProjectSync\Services\OrderReferenceGenerator;
 use ProjectSync\Validators\BusinessProfileValidator;
 use ProjectSync\Validators\CategoryValidator;
 use ProjectSync\Validators\LoginValidator;
+use ProjectSync\Validators\OrderListQueryValidator;
+use ProjectSync\Validators\OrderStatusUpdateValidator;
 use ProjectSync\Validators\ProductImageValidator;
 use ProjectSync\Validators\ProductListQueryValidator;
 use ProjectSync\Validators\ProductValidator;
@@ -197,6 +202,7 @@ final class AppFactory
         );
         $orderRepository = new OrderRepository($connection);
         $orderItems = new OrderItemRepository($connection);
+        $notificationService = NotificationFactory::service($connection, $config, $logger);
         $checkoutService = new CheckoutService(
             $connection,
             new BusinessProfileRepository($connection),
@@ -206,7 +212,7 @@ final class AppFactory
             new OrderReferenceGenerator(),
             new OrderConfirmationTokenService($config->requiredString('checkout.security_secret')),
             (int) $config->requiredString('checkout.max_total_kobo'),
-            NotificationFactory::service($connection, $config, $logger),
+            $notificationService,
         );
         $checkoutRateLimiter = new CheckoutRateLimiter($attempts, $config);
         $orderController = new OrderController(
@@ -220,11 +226,41 @@ final class AppFactory
             },
         );
         $confirmationController = new OrderConfirmationController($checkoutService, $checkoutRateLimiter);
+        $orderStatusHistory = new OrderStatusHistoryRepository($connection);
+        $orderManagementService = new OrderManagementService(
+            $connection,
+            $orderRepository,
+            $orderItems,
+            $orderStatusHistory,
+            new OrderListQueryValidator(),
+            new OrderStatusUpdateValidator(),
+            $notificationService,
+        );
+        $orderManagementController = new OrderManagementController(
+            $orderManagementService,
+            $authenticationMiddleware,
+            static function (): string {
+                $body = file_get_contents('php://input');
+
+                return is_string($body) ? $body : '';
+            },
+        );
 
         return new Application(
             config: $config,
             logger: $logger,
-            routes: $routes(new HealthController(), new AuthController($auth, new LoginValidator(), $refreshCookie, new SameOriginPolicy($config->requiredString('auth.application_origin')), $authenticationMiddleware, static function (): string { $body = file_get_contents('php://input'); return is_string($body) ? $body : ''; }), new CurrentAdminController($authenticationMiddleware), $profileController, $categoryController, $productController, $productImageController, $orderController, $confirmationController),
+            routes: $routes(
+                new HealthController(),
+                new AuthController($auth, new LoginValidator(), $refreshCookie, new SameOriginPolicy($config->requiredString('auth.application_origin')), $authenticationMiddleware, static function (): string { $body = file_get_contents('php://input'); return is_string($body) ? $body : ''; }),
+                new CurrentAdminController($authenticationMiddleware),
+                $profileController,
+                $categoryController,
+                $productController,
+                $productImageController,
+                $orderController,
+                $confirmationController,
+                $orderManagementController,
+            ),
             middleware: [new RequestIdMiddleware(), new CorsMiddleware($config->stringList('cors.allowed_origins'))],
         );
     }

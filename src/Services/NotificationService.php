@@ -96,6 +96,38 @@ final readonly class NotificationService
         return hash_hmac('sha256', 'notification-recipient-v1|' . strtolower($recipient), $this->securitySecret);
     }
 
+    /**
+     * @param array<string, mixed> $order
+     */
+    public function notifyStatusChange(array $order, string $newStatus): void
+    {
+        $business = $this->profiles->notificationConfiguration();
+        if ($business === null) {
+            return;
+        }
+        $orderId = $order['id'] ?? null;
+        $customerRecipient = $order['customer_email'] ?? null;
+        if (!is_string($orderId) || !is_string($customerRecipient) || ($business['customer_email_notifications_enabled'] ?? false) !== true) {
+            return;
+        }
+
+        try {
+            $id = UuidGenerator::v4();
+            $recipientType = 'customer_status_' . $newStatus;
+            if ($this->jobs->create($id, $orderId, $recipientType, $this->recipientHash($customerRecipient), $this->maxAttempts)) {
+                if ($this->immediateEmailEnabled) {
+                    $this->processor->processOne($id);
+                }
+            }
+        } catch (Throwable $e) {
+            $this->logger->error('Order status notification job creation failed.', [
+                'order_reference' => $order['reference'] ?? null,
+                'status' => $newStatus,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /** @return array{whatsapp_url: null, notification: array{merchant_email: string, customer_email: string}} */
     private function emptyState(): array
     {

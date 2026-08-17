@@ -30,3 +30,19 @@ Status: approved for MVP.
 - Jobs store no addresses or bodies; recipients are resolved from permitted order/business fields during processing.
 - WhatsApp handoff creates a URL for the business number without an API call or automatic sending.
 - Merchant order notification uses a dedicated address with `support_email` fallback. Customer email is opt-in at business level and requires an order email.
+
+## 2026-08-17 — Phase 4 Merchant order management and status lifecycle
+
+Status: approved for MVP.
+
+- Merchant order management endpoints require Bearer JWT authentication and operate strictly on the isolated single-tenant merchant database.
+- The order status lifecycle follows explicit allowable transitions with `new` as the single canonical initial fulfilment status:
+  - `new` $\rightarrow$ `confirmed`, `cancelled`
+  - `confirmed` $\rightarrow$ `processing`, `cancelled`
+  - `processing` $\rightarrow$ `ready`, `cancelled`
+  - `ready` $\rightarrow$ `completed`, `cancelled`
+  - Terminal statuses `completed` and `cancelled` cannot transition into any active state.
+- Status mutations execute inside database transactions with `FOR UPDATE` pessimistic row locking to prevent race conditions across concurrent admin requests.
+- Same-status mutations are idempotent (`unchanged: true` / `meta.idempotent_replay: true`), generating no duplicate history entries and no duplicate notification jobs.
+- All valid status transitions append audit records to `order_status_history`, recording `previous_status`, `new_status`, `changed_by` admin user ID, and timestamp.
+- Customer notification jobs for order status updates are enqueued asynchronously in the persistent notification queue; order state changes commit independently of email transport delivery.

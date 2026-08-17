@@ -107,7 +107,7 @@ final readonly class NotificationProcessor
                 throw new EmailDeliveryException('NOTIFICATION_RECIPIENT_UNAVAILABLE');
             }
             $recipient = $business['order_notification_email'] ?? $business['support_email'] ?? null;
-        } elseif ($recipientType === 'customer') {
+        } elseif ($recipientType === 'customer' || (is_string($recipientType) && str_starts_with($recipientType, 'customer_status_'))) {
             if (($business['customer_email_notifications_enabled'] ?? false) !== true) {
                 throw new EmailDeliveryException('NOTIFICATION_RECIPIENT_UNAVAILABLE');
             }
@@ -119,9 +119,15 @@ final readonly class NotificationProcessor
             throw new EmailDeliveryException('NOTIFICATION_RECIPIENT_UNAVAILABLE');
         }
 
-        return $recipientType === 'merchant'
-            ? $this->emails->merchant($order, $business, $recipient)
-            : $this->emails->customer($order, $business, $recipient);
+        if ($recipientType === 'merchant') {
+            return $this->emails->merchant($order, $business, $recipient);
+        }
+        if (str_starts_with($recipientType, 'customer_status_')) {
+            $status = substr($recipientType, strlen('customer_status_'));
+            return $this->emails->customerStatusUpdate($order, $business, $recipient, $status);
+        }
+
+        return $this->emails->customer($order, $business, $recipient);
     }
 
     /** @param array<array-key, mixed> $values */

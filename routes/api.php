@@ -12,9 +12,10 @@ use ProjectSync\Controllers\OrderController;
 use ProjectSync\Controllers\OrderConfirmationController;
 use ProjectSync\Controllers\Admin\AuthController;
 use ProjectSync\Controllers\Admin\CurrentAdminController;
+use ProjectSync\Controllers\Admin\OrderManagementController;
 
-return static function (HealthController $health, AuthController $auth, CurrentAdminController $current, BusinessProfileController $profile, CategoryController $categories, ProductController $products, ProductImageController $productImages, OrderController $orders, OrderConfirmationController $confirmations): callable {
-    return static function (RouteCollector $router) use ($health, $auth, $current, $profile, $categories, $products, $productImages, $orders, $confirmations): void {
+return static function (HealthController $health, AuthController $auth, CurrentAdminController $current, BusinessProfileController $profile, CategoryController $categories, ProductController $products, ProductImageController $productImages, OrderController $orders, OrderConfirmationController $confirmations, OrderManagementController $orderAdmin): callable {
+    return static function (RouteCollector $router) use ($health, $auth, $current, $profile, $categories, $products, $productImages, $orders, $confirmations, $orderAdmin): void {
         $router->addRoute('GET', '/api/v1/health', $health);
         $router->addRoute('GET', '/api/v1/store', [$profile, 'store']);
         $router->addRoute('GET', '/api/v1/categories', [$categories, 'publicList']);
@@ -38,6 +39,10 @@ return static function (HealthController $health, AuthController $auth, CurrentA
         $router->addRoute('PUT', '/api/v1/admin/products/{id}', [$products, 'update']);
         $router->addRoute('DELETE', '/api/v1/admin/products/{id}', [$products, 'delete']);
         $router->addRoute('POST', '/api/v1/admin/products/{id}/image', [$productImages, 'upload']);
+        $router->addRoute('GET', '/api/v1/admin/orders', [$orderAdmin, 'list']);
+        $router->addRoute('GET', '/api/v1/admin/orders/summary', [$orderAdmin, 'summary']);
+        $router->addRoute('GET', '/api/v1/admin/orders/{id}', [$orderAdmin, 'detail']);
+        $router->addRoute('PATCH', '/api/v1/admin/orders/{id}/status', [$orderAdmin, 'updateStatus']);
         $router->addRoute('POST', '/api/v1/admin/logout', [$auth, 'logout']);
     };
 };

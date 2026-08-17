@@ -50,6 +50,26 @@ final class OrderEmailBuilder
 
     /**
      * @param array<string, mixed> $order
+     * @param array<string, mixed> $business
+     */
+    public function customerStatusUpdate(array $order, array $business, string $recipient, string $status): EmailMessage
+    {
+        $lines = [
+            $this->string($business, 'business_name'),
+            'Order ' . $this->string($order, 'reference') . ' is now ' . ucfirst($status),
+            'Customer: ' . $this->string($order, 'customer_name'),
+        ];
+        $lines = array_merge($lines, $this->details($order, false));
+        $contact = $business['support_email'] ?? null;
+        if (is_string($contact)) {
+            $lines[] = 'Business contact: ' . $contact;
+        }
+
+        return new EmailMessage($recipient, 'Order ' . $this->string($order, 'reference') . ' status update: ' . ucfirst($status), implode("\n", $lines));
+    }
+
+    /**
+     * @param array<string, mixed> $order
      * @return list<string>
      */
     private function details(array $order, bool $includePrices): array
