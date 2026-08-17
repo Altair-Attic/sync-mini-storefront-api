@@ -160,7 +160,7 @@ final class OrderApiTest extends TestCase
         self::assertArrayHasKey('whatsapp_url', $confirmationData);
     }
 
-    public function testCheckoutRequiresJsonAndIdempotencyWithoutAdminSessionOrCsrf(): void
+    public function testCheckoutRequiresJsonAndIdempotencyWithoutAdministratorAuthentication(): void
     {
         $this->body = '{}';
         $media = $this->application->handle(['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/api/v1/orders', 'REMOTE_ADDR' => '192.0.2.124']);

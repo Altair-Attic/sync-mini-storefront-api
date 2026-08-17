@@ -14,7 +14,6 @@ use ProjectSync\Infrastructure\HttpResponse;
 use ProjectSync\Infrastructure\JsonResponse;
 use ProjectSync\Infrastructure\RequestParser;
 use ProjectSync\Middleware\AuthenticationMiddleware;
-use ProjectSync\Middleware\CsrfMiddleware;
 use ProjectSync\Services\ProductService;
 
 final readonly class ProductController
@@ -23,7 +22,6 @@ final readonly class ProductController
     public function __construct(
         private ProductService $products,
         private AuthenticationMiddleware $authentication,
-        private CsrfMiddleware $csrf,
         private Closure $readBody,
     ) {
     }
@@ -60,7 +58,7 @@ final readonly class ProductController
      */
     public function adminList(string $requestId, array $server, array $route = []): HttpResponse
     {
-        $failure = $this->authenticate($requestId);
+        $failure = $this->authenticate($requestId, $server);
         if ($failure !== null) {
             return $failure;
         }
@@ -77,7 +75,7 @@ final readonly class ProductController
      */
     public function show(string $requestId, array $server, array $route): HttpResponse
     {
-        $failure = $this->authenticate($requestId);
+        $failure = $this->authenticate($requestId, $server);
         if ($failure !== null) {
             return $failure;
         }
@@ -112,7 +110,7 @@ final readonly class ProductController
      */
     public function delete(string $requestId, array $server, array $route): HttpResponse
     {
-        $failure = $this->authenticateAndCsrf($requestId, $server);
+        $failure = $this->authenticate($requestId, $server);
         if ($failure !== null) {
             return $failure;
         }
@@ -126,7 +124,7 @@ final readonly class ProductController
     /** @param array<string, mixed> $server */
     private function write(string $requestId, array $server, ?string $id): HttpResponse
     {
-        $failure = $this->authenticateAndCsrf($requestId, $server);
+        $failure = $this->authenticate($requestId, $server);
         if ($failure !== null) {
             return $failure;
         }
@@ -162,17 +160,12 @@ final readonly class ProductController
         ]);
     }
 
-    private function authenticate(string $requestId): ?HttpResponse
+    /** @param array<string, mixed> $server */
+    private function authenticate(string $requestId, array $server): ?HttpResponse
     {
-        $result = $this->authentication->requireAdministrator($requestId);
+        $result = $this->authentication->requireAdministrator($requestId, $server);
 
         return $result instanceof HttpResponse ? $result : null;
-    }
-
-    /** @param array<string, mixed> $server */
-    private function authenticateAndCsrf(string $requestId, array $server): ?HttpResponse
-    {
-        return $this->authenticate($requestId) ?? $this->csrf->requireValidToken($requestId, $server);
     }
 
     private function notFound(string $requestId): HttpResponse

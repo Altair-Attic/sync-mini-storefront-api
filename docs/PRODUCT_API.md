@@ -28,7 +28,7 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
 
 ## Admin endpoints
 
-| Method | Path | CSRF | Content type |
+| Method | Path | Authentication | Content type |
 |---|---|---|---|
 | GET | `/api/v1/admin/products` | No | — |
 | POST | `/api/v1/admin/products` | Yes | `application/json` |
@@ -37,7 +37,7 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
 | DELETE | `/api/v1/admin/products/{id}` | Yes | — |
 | POST | `/api/v1/admin/products/{id}/image` | Yes | `multipart/form-data` (`image`) |
 
-All admin endpoints require the same-origin administrator session. Listing supports `category_id`, `status=active|inactive|all` (default `all`), bounded `search`, the public pagination fields, and all public sort modes.
+All admin endpoints require an administrator JWT in `Authorization: Bearer <access-token>`. Listing supports `category_id`, `status=active|inactive|all` (default `all`), bounded `search`, the public pagination fields, and all public sort modes.
 
 POST and PUT are full representations. `category_id` is nullable and must identify an active category when assigning or changing the assignment. Existing assignments survive category deactivation. `slug` may be generated from `title`, which is trimmed and 2–160 characters. `description` is nullable and limited to 10,000 characters. `price_kobo` must be a JSON integer at least zero. `image_url` is nullable and must be HTTPS or an application-managed absolute path. `is_active` is boolean and `display_order` is a non-negative integer. Unknown fields and immutable `id`, `public_id`, `created_at`, `updated_at`, and `currency` are rejected.
 
@@ -59,4 +59,4 @@ Configuration:
 
 cPanel must provide PHP `fileinfo`; GD plus WebP support is required for conversion/resizing. The storage directory must be writable by PHP, remain outside the source and document root, deny script execution, and be exposed only as static media through the configured public mapping.
 
-Relevant errors are `PRODUCT_NOT_FOUND`, `PRODUCT_SLUG_CONFLICT`, `INVALID_CATEGORY`, `VALIDATION_FAILED`, `UNAUTHENTICATED`, `CSRF_TOKEN_INVALID`, `UNSUPPORTED_MEDIA_TYPE`, `UPLOAD_TOO_LARGE`, and `INTERNAL_ERROR`.
+Relevant errors are `PRODUCT_NOT_FOUND`, `PRODUCT_SLUG_CONFLICT`, `INVALID_CATEGORY`, `VALIDATION_FAILED`, `UNAUTHENTICATED`, `UNSUPPORTED_MEDIA_TYPE`, `UPLOAD_TOO_LARGE`, and `INTERNAL_ERROR`.

@@ -57,11 +57,6 @@ final class CatalogueApiTest extends TestCase
     {
         $this->db->prepare("DELETE FROM products WHERE slug LIKE 'catalogue-api-%'")->execute();
         $this->db->prepare("DELETE FROM categories WHERE slug LIKE 'catalogue-api-%'")->execute();
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION = [];
-            session_destroy();
-        }
-        session_id('');
     }
 
     public function testPublicCatalogueHidesInactiveRecordsAndInactiveCategoryNavigation(): void

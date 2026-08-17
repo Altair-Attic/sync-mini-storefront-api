@@ -13,12 +13,15 @@ use ProjectSync\Controllers\OrderController;
 use ProjectSync\Controllers\OrderConfirmationController;
 use ProjectSync\Controllers\Admin\AuthController;
 use ProjectSync\Controllers\Admin\CurrentAdminController;
-use ProjectSync\Infrastructure\Session\SessionManager;
+use ProjectSync\Infrastructure\Auth\JwtService;
+use ProjectSync\Infrastructure\Auth\RefreshCookie;
+use ProjectSync\Infrastructure\Auth\SameOriginPolicy;
 use ProjectSync\Middleware\CorsMiddleware;
 use ProjectSync\Middleware\AuthenticationMiddleware;
-use ProjectSync\Middleware\CsrfMiddleware;
 use ProjectSync\Middleware\RequestIdMiddleware;
 use ProjectSync\Repositories\LoginAttemptRepository;
+use ProjectSync\Repositories\AdminRefreshTokenRepository;
+use ProjectSync\Repositories\RevokedAccessTokenRepository;
 use ProjectSync\Repositories\BusinessProfileRepository;
 use ProjectSync\Repositories\CategoryRepository;
 use ProjectSync\Repositories\ProductRepository;
@@ -26,7 +29,6 @@ use ProjectSync\Repositories\MerchantUserRepository;
 use ProjectSync\Repositories\OrderItemRepository;
 use ProjectSync\Repositories\OrderRepository;
 use ProjectSync\Services\AuthenticationService;
-use ProjectSync\Services\CsrfTokenService;
 use ProjectSync\Services\LoginRateLimiter;
 use ProjectSync\Services\BusinessProfileService;
 use ProjectSync\Services\CategoryService;
@@ -61,7 +63,19 @@ final class AppFactory
             'db.database' => $database['database'],
             'db.username' => $database['username'],
             'db.password' => $database['password'],
-            'session.name' => $app['session']['name'], 'session.lifetime' => (string) $app['session']['lifetime'], 'session.secure_cookie' => $app['session']['secure_cookie'], 'session.same_site' => $app['session']['same_site'], 'session.domain' => $app['session']['domain'], 'session.csrf_token_ttl' => (string) $app['session']['csrf_token_ttl'],
+            'auth.jwt_secret' => $app['authentication']['jwt_secret'],
+            'auth.jwt_issuer' => $app['authentication']['jwt_issuer'],
+            'auth.jwt_audience' => $app['authentication']['jwt_audience'],
+            'auth.jwt_access_ttl_seconds' => (string) $app['authentication']['jwt_access_ttl_seconds'],
+            'auth.jwt_clock_skew_seconds' => (string) $app['authentication']['jwt_clock_skew_seconds'],
+            'auth.jwt_algorithm' => $app['authentication']['jwt_algorithm'],
+            'auth.refresh_token_ttl_seconds' => (string) $app['authentication']['refresh_token_ttl_seconds'],
+            'auth.refresh_cookie_name' => $app['authentication']['refresh_cookie_name'],
+            'auth.refresh_cookie_path' => $app['authentication']['refresh_cookie_path'],
+            'auth.refresh_cookie_secure' => $app['authentication']['refresh_cookie_secure'],
+            'auth.refresh_cookie_same_site' => $app['authentication']['refresh_cookie_same_site'],
+            'auth.refresh_token_security_secret' => $app['authentication']['refresh_token_security_secret'],
+            'auth.application_origin' => $app['authentication']['application_origin'],
             'login.max_attempts' => (string) $app['login']['max_attempts'], 'login.window_seconds' => (string) $app['login']['window_seconds'], 'login.block_seconds' => (string) $app['login']['block_seconds'], 'login.rate_limit_secret' => $app['login']['rate_limit_secret'],
             'product_images.max_bytes' => (string) $app['product_images']['max_bytes'],
             'product_images.max_width' => (string) $app['product_images']['max_width'],
@@ -93,21 +107,45 @@ final class AppFactory
             'notifications.security_secret' => $app['notifications']['security_secret'],
         ]);
         $config->allowedString('app.environment', ['local', 'testing', 'staging', 'production']);
+        self::validateAuthenticationConfig($config);
         LoggerFactory::assertValidLevel($config->requiredString('app.log_level'));
         (new DatabaseConnection($config))->validate();
         $logger = LoggerFactory::create($root . '/storage/logs/application.log', $app['log_level']);
         $routes = require $root . '/routes/api.php';
         $connection = (new DatabaseConnection($config))->connect();
-        $session = new SessionManager($config);
-        $csrf = new CsrfTokenService($session, (int) $config->requiredString('session.csrf_token_ttl'));
         $attempts = new LoginAttemptRepository($connection);
-        $auth = new AuthenticationService(new MerchantUserRepository($connection), new LoginRateLimiter($attempts, $config), $session, $csrf, $logger);
-        $authenticationMiddleware = new AuthenticationMiddleware($auth);
-        $csrfMiddleware = new CsrfMiddleware($csrf, $logger);
+        $users = new MerchantUserRepository($connection);
+        $refreshTokens = new AdminRefreshTokenRepository($connection);
+        $revokedAccessTokens = new RevokedAccessTokenRepository($connection);
+        $jwt = new JwtService(
+            $config->requiredString('auth.jwt_secret'),
+            $config->requiredString('auth.jwt_issuer'),
+            $config->requiredString('auth.jwt_audience'),
+            (int) $config->requiredString('auth.jwt_access_ttl_seconds'),
+            (int) $config->requiredString('auth.jwt_clock_skew_seconds'),
+            $config->requiredString('auth.jwt_algorithm'),
+        );
+        $auth = new AuthenticationService(
+            $users,
+            $refreshTokens,
+            $revokedAccessTokens,
+            new LoginRateLimiter($attempts, $config),
+            $jwt,
+            $config->requiredString('auth.refresh_token_security_secret'),
+            (int) $config->requiredString('auth.refresh_token_ttl_seconds'),
+            $logger,
+        );
+        $authenticationMiddleware = new AuthenticationMiddleware($jwt, $users, $revokedAccessTokens);
+        $refreshCookie = new RefreshCookie(
+            $config->requiredString('auth.refresh_cookie_name'),
+            $config->requiredString('auth.refresh_cookie_path'),
+            $config->bool('auth.refresh_cookie_secure'),
+            $config->requiredString('auth.refresh_cookie_same_site'),
+            (int) $config->requiredString('auth.refresh_token_ttl_seconds'),
+        );
         $profileController = new BusinessProfileController(
             new BusinessProfileService(new BusinessProfileRepository($connection), new BusinessProfileValidator()),
             $authenticationMiddleware,
-            $csrfMiddleware,
             static function (): string {
                 $body = file_get_contents('php://input');
 
@@ -119,7 +157,6 @@ final class AppFactory
         $categoryController = new CategoryController(
             new CategoryService($categories, new CategoryValidator()),
             $authenticationMiddleware,
-            $csrfMiddleware,
             static function (): string {
                 $body = file_get_contents('php://input');
 
@@ -129,7 +166,6 @@ final class AppFactory
         $productController = new ProductController(
             new ProductService($products, $categories, new ProductValidator(), new ProductListQueryValidator()),
             $authenticationMiddleware,
-            $csrfMiddleware,
             static function (): string {
                 $body = file_get_contents('php://input');
 
@@ -152,7 +188,6 @@ final class AppFactory
                 ),
             ),
             $authenticationMiddleware,
-            $csrfMiddleware,
             static fn (): array => $_FILES,
         );
         $checkoutValidator = new CheckoutValidator(
@@ -189,7 +224,7 @@ final class AppFactory
         return new Application(
             config: $config,
             logger: $logger,
-            routes: $routes(new HealthController(), new AuthController($auth, new LoginValidator(), $csrf, $csrfMiddleware, $authenticationMiddleware), new CurrentAdminController($authenticationMiddleware), $profileController, $categoryController, $productController, $productImageController, $orderController, $confirmationController),
+            routes: $routes(new HealthController(), new AuthController($auth, new LoginValidator(), $refreshCookie, new SameOriginPolicy($config->requiredString('auth.application_origin')), $authenticationMiddleware, static function (): string { $body = file_get_contents('php://input'); return is_string($body) ? $body : ''; }), new CurrentAdminController($authenticationMiddleware), $profileController, $categoryController, $productController, $productImageController, $orderController, $confirmationController),
             middleware: [new RequestIdMiddleware(), new CorsMiddleware($config->stringList('cors.allowed_origins'))],
         );
     }
@@ -197,5 +232,42 @@ final class AppFactory
     private static function absolutePath(string $path): bool
     {
         return str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;
+    }
+
+    private static function validateAuthenticationConfig(Config $config): void
+    {
+        $environment = $config->requiredString('app.environment');
+        $algorithm = $config->allowedString('auth.jwt_algorithm', ['HS256']);
+        $sameSite = $config->allowedString('auth.refresh_cookie_same_site', ['Strict', 'Lax']);
+        $jwtSecret = $config->requiredString('auth.jwt_secret');
+        $refreshSecret = $config->requiredString('auth.refresh_token_security_secret');
+        $accessTtl = (int) $config->requiredString('auth.jwt_access_ttl_seconds');
+        $clockSkew = (int) $config->requiredString('auth.jwt_clock_skew_seconds');
+        $refreshTtl = (int) $config->requiredString('auth.refresh_token_ttl_seconds');
+        $cookieName = $config->requiredString('auth.refresh_cookie_name');
+        $cookiePath = $config->requiredString('auth.refresh_cookie_path');
+        if ($algorithm !== 'HS256' || $sameSite === '' || $accessTtl < 60 || $accessTtl > 900 || $clockSkew < 0 || $clockSkew > 60 || $refreshTtl < 300) {
+            throw new \ProjectSync\Exceptions\ConfigurationException('Authentication lifetime or algorithm configuration is invalid.');
+        }
+        if (preg_match('/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D', $cookieName) !== 1
+            || !str_starts_with($cookiePath, '/')
+            || preg_match('/[;\x00-\x1F\x7F]/', $cookiePath) === 1
+        ) {
+            throw new \ProjectSync\Exceptions\ConfigurationException('Refresh-cookie name or path is invalid.');
+        }
+        if (hash_equals($jwtSecret, $refreshSecret)) {
+            throw new \ProjectSync\Exceptions\ConfigurationException('JWT and refresh-token secrets must be different.');
+        }
+        if ($environment === 'production') {
+            if (strlen($jwtSecret) < 32 || strlen($refreshSecret) < 32
+                || str_contains(strtolower($jwtSecret), 'change-this') || str_contains(strtolower($refreshSecret), 'change-this')
+                || !$config->bool('auth.refresh_cookie_secure') || $sameSite !== 'Strict'
+            ) {
+                throw new \ProjectSync\Exceptions\ConfigurationException('Production authentication secrets and cookie settings are insecure.');
+            }
+            if (!str_starts_with($config->requiredString('auth.application_origin'), 'https://')) {
+                throw new \ProjectSync\Exceptions\ConfigurationException('Production APP_URL must use HTTPS.');
+            }
+        }
     }
 }

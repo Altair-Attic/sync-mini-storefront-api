@@ -11,32 +11,20 @@ use PHPUnit\Framework\TestCase;
 use ProjectSync\Controllers\BusinessProfileController;
 use ProjectSync\Infrastructure\Application;
 use ProjectSync\Infrastructure\Config;
-use ProjectSync\Infrastructure\Session\SessionManager;
+use ProjectSync\Infrastructure\Auth\JwtService;
 use ProjectSync\Middleware\AuthenticationMiddleware;
 use ProjectSync\Middleware\CorsMiddleware;
-use ProjectSync\Middleware\CsrfMiddleware;
 use ProjectSync\Middleware\RequestIdMiddleware;
 use ProjectSync\Repositories\BusinessProfileRepository;
-use ProjectSync\Repositories\LoginAttemptRepository;
 use ProjectSync\Repositories\MerchantUserRepository;
-use ProjectSync\Services\AuthenticationService;
+use ProjectSync\Repositories\RevokedAccessTokenRepository;
 use ProjectSync\Services\BusinessProfileService;
-use ProjectSync\Services\CsrfTokenService;
-use ProjectSync\Services\LoginRateLimiter;
 use ProjectSync\Validators\BusinessProfileValidator;
 use Psr\Log\AbstractLogger;
 
 final class BusinessProfileApiTest extends TestCase
 {
-    protected function tearDown(): void
-    {
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION = [];
-            session_destroy();
-        }
-        session_id('');
-        parent::tearDown();
-    }
+    private const ADMINISTRATOR_ID = '11111111-1111-4111-8111-111111111111';
 
     public function testPublicStoreProfileCanBeRetrievedWithoutAuthenticationAndOnlyHasSafeFields(): void
     {
@@ -83,7 +71,7 @@ final class BusinessProfileApiTest extends TestCase
         $input['whatsapp_number'] = '0803 573 2952';
         $input['support_email'] = ' SUPPORT@EXAMPLE.COM ';
         $input['order_notification_email'] = ' ORDERS@EXAMPLE.COM ';
-        $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $input, true);
+        $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $input);
         $responseProfile = $this->responseProfile($response);
 
         self::assertSame(200, $response->status);
@@ -96,7 +84,7 @@ final class BusinessProfileApiTest extends TestCase
         self::assertSame('demo.example.com', $responseProfile['domain']);
     }
 
-    public function testUpdateWithoutAuthenticationReturns401BeforeCsrfValidation(): void
+    public function testUpdateWithoutAuthenticationReturns401(): void
     {
         $profile = $this->profile();
         $response = $this->request($profile, false, 'PUT', '/api/v1/admin/profile', $this->validInput());
@@ -104,19 +92,10 @@ final class BusinessProfileApiTest extends TestCase
         self::assertSame(401, $response->status);
     }
 
-    public function testUpdateWithoutCsrfReturns403(): void
-    {
-        $profile = $this->profile();
-        $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $this->validInput());
-
-        self::assertSame(403, $response->status);
-        self::assertSame('CSRF_TOKEN_INVALID', $this->responseError($response)['code']);
-    }
-
     public function testMissingJsonContentTypeIsRejected(): void
     {
         $profile = $this->profile();
-        $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $this->validInput(), true, false);
+        $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $this->validInput(), false);
 
         self::assertSame(415, $response->status);
         self::assertSame('UNSUPPORTED_MEDIA_TYPE', $this->responseError($response)['code']);
@@ -129,7 +108,7 @@ final class BusinessProfileApiTest extends TestCase
         $profile = $this->profile();
         $input = $this->validInput();
         $input[$field] = $value;
-        $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $input, true);
+        $response = $this->request($profile, true, 'PUT', '/api/v1/admin/profile', $input);
 
         self::assertSame(422, $response->status);
         $error = $this->responseError($response);
@@ -175,7 +154,7 @@ final class BusinessProfileApiTest extends TestCase
      * @param array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, created_at: string, updated_at: string}|null $profile
      * @param array<string, mixed>|null $body
      */
-    private function request(?array &$profile, bool $authenticated, string $method, string $uri, ?array $body = null, bool $csrfValid = false, bool $jsonContentType = true, bool $databaseFailure = false): \ProjectSync\Infrastructure\HttpResponse
+    private function request(?array &$profile, bool $authenticated, string $method, string $uri, ?array $body = null, bool $jsonContentType = true, bool $databaseFailure = false): \ProjectSync\Infrastructure\HttpResponse
     {
         $logger = new class ($databaseFailure) extends AbstractLogger {
             public function __construct(private readonly bool $allowError) {}
@@ -193,32 +172,13 @@ final class BusinessProfileApiTest extends TestCase
             'app.environment' => 'testing',
             'app.debug' => false,
             'cors.allowed_origins' => [],
-            'session.name' => 'business_profile_test_' . bin2hex(random_bytes(4)),
-            'session.lifetime' => '7200',
-            'session.secure_cookie' => false,
-            'session.same_site' => 'Lax',
-            'session.domain' => '',
-            'login.max_attempts' => '5',
-            'login.window_seconds' => '900',
-            'login.block_seconds' => '900',
-            'login.rate_limit_secret' => 'test-secret',
         ]);
-        $session = new SessionManager($config);
-        $csrf = new CsrfTokenService($session, 3600);
-        $authenticationService = new AuthenticationService(
-            new MerchantUserRepository($pdo),
-            new LoginRateLimiter(new LoginAttemptRepository($pdo), $config),
-            $session,
-            $csrf,
-            $logger,
-        );
-        $authentication = new AuthenticationMiddleware($authenticationService);
-        $csrfMiddleware = new CsrfMiddleware($csrf, $logger);
+        $jwt = new JwtService('business-profile-jwt-test-secret-32-bytes', 'https://test.example', 'https://test.example/admin', 900, 30, 'HS256');
+        $authentication = new AuthenticationMiddleware($jwt, new MerchantUserRepository($pdo), new RevokedAccessTokenRepository($pdo));
         $encodedBody = $body === null ? '' : json_encode($body, JSON_THROW_ON_ERROR);
         $controller = new BusinessProfileController(
             new BusinessProfileService(new BusinessProfileRepository($pdo), new BusinessProfileValidator()),
             $authentication,
-            $csrfMiddleware,
             static fn (): string => $encodedBody,
         );
         $routes = static function (\FastRoute\RouteCollector $router) use ($controller): void {
@@ -226,20 +186,12 @@ final class BusinessProfileApiTest extends TestCase
             $router->addRoute('GET', '/api/v1/admin/profile', [$controller, 'admin']);
             $router->addRoute('PUT', '/api/v1/admin/profile', [$controller, 'update']);
         };
-        $session->start();
-        if ($authenticated) {
-            $_SESSION['admin_id'] = 'admin-1';
-        }
-        if ($csrfValid) {
-            $_SESSION['csrf_token'] = 'valid-token';
-            $_SESSION['csrf_issued_at'] = time();
-        }
         $server = ['REQUEST_METHOD' => $method, 'REQUEST_URI' => $uri];
         if ($jsonContentType) {
             $server['CONTENT_TYPE'] = 'application/json; charset=utf-8';
         }
-        if ($csrfValid) {
-            $server['HTTP_X_CSRF_TOKEN'] = 'valid-token';
+        if ($authenticated) {
+            $server['HTTP_AUTHORIZATION'] = 'Bearer ' . $jwt->issue(self::ADMINISTRATOR_ID)['access_token'];
         }
 
         return (new Application($config, $logger, $routes, [new RequestIdMiddleware(), new CorsMiddleware([])]))->handle($server);
@@ -271,7 +223,7 @@ final class BusinessProfileApiTest extends TestCase
             if (str_contains($sql, 'FROM business_profiles')) {
                 $statement->method('fetch')->willReturnCallback(static fn (): array|false => $profile ?? false);
             } elseif (str_contains($sql, 'FROM merchant_users')) {
-                $statement->method('fetch')->willReturn(['id' => 'admin-1', 'name' => 'Owner', 'email' => 'owner@example.com']);
+                $statement->method('fetch')->willReturn(['id' => self::ADMINISTRATOR_ID, 'name' => 'Owner', 'email' => 'owner@example.com']);
             }
 
             return $statement;

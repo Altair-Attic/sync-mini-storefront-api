@@ -94,7 +94,7 @@ Do not place application logic in the public entry point, route definitions, tem
 - Preserve immutable order-item snapshots so later catalogue changes do not rewrite historical orders.
 - Use explicit status values and validate every state transition.
 - Add indexes based on real query paths, especially foreign keys, order lookup, status filtering, and reporting date ranges.
-- Never log secrets, password hashes, reset tokens, complete session identifiers, or unnecessary personal data.
+- Never log secrets, password hashes, reset tokens, complete JWTs, refresh tokens, or unnecessary personal data.
 
 ## 7. API conventions
 
@@ -124,9 +124,11 @@ Tests must cover double submission, request retry, price tampering, invalid quan
 
 ## 9. Authentication and security
 
-- Use secure, HTTP-only, same-site session cookies for merchant administration.
-- Regenerate the session identifier after successful login.
-- Protect state-changing browser requests against CSRF.
+- Use short-lived, signed JWT access tokens in the `Authorization: Bearer` header for merchant administration.
+- Store administrator access tokens only in frontend memory; never document or implement `localStorage` or `sessionStorage` persistence.
+- Use rotating opaque refresh tokens in Secure, HTTP-only, host-only, same-site cookies; store only protected token hashes in MySQL.
+- Validate same-origin `Origin` or `Referer` values on login and every refresh-cookie operation.
+- Revoke the complete refresh-token family when a rotated token is reused or the administrator logs out.
 - Use PHP's `password_hash` and `password_verify`; never design custom password cryptography.
 - Rate-limit login, password-reset, checkout, upload, and other abuse-sensitive endpoints.
 - Apply authorization checks on the server for every protected operation.
@@ -236,4 +238,3 @@ Do not hide uncertainty. Label assumptions and distinguish verified behavior fro
 Record meaningful architecture decisions in the repository rather than leaving them only in chat. Before implementing a feature affected by an unresolved decision in `PROJECT_ARCHITECTURE.md`, confirm the decision with the responsible product or engineering owner.
 
 Changes to tenant isolation, payment flow, authentication, public API contracts, data retention, update strategy, or central-control behavior require an explicit architecture update and review.
-

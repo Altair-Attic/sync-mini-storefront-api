@@ -11,7 +11,6 @@ use ProjectSync\Exceptions\ValidationException;
 use ProjectSync\Infrastructure\HttpResponse;
 use ProjectSync\Infrastructure\JsonResponse;
 use ProjectSync\Middleware\AuthenticationMiddleware;
-use ProjectSync\Middleware\CsrfMiddleware;
 use ProjectSync\Services\BusinessProfileService;
 
 final readonly class BusinessProfileController
@@ -20,7 +19,6 @@ final readonly class BusinessProfileController
     public function __construct(
         private BusinessProfileService $profiles,
         private AuthenticationMiddleware $authentication,
-        private CsrfMiddleware $csrf,
         private Closure $readBody,
     ) {
     }
@@ -34,9 +32,10 @@ final readonly class BusinessProfileController
         }
     }
 
-    public function admin(string $requestId): HttpResponse
+    /** @param array<string, mixed> $server */
+    public function admin(string $requestId, array $server): HttpResponse
     {
-        $administrator = $this->authentication->requireAdministrator($requestId);
+        $administrator = $this->authentication->requireAdministrator($requestId, $server);
         if ($administrator instanceof HttpResponse) {
             return $administrator;
         }
@@ -51,13 +50,9 @@ final readonly class BusinessProfileController
     /** @param array<string, mixed> $server */
     public function update(string $requestId, array $server): HttpResponse
     {
-        $administrator = $this->authentication->requireAdministrator($requestId);
+        $administrator = $this->authentication->requireAdministrator($requestId, $server);
         if ($administrator instanceof HttpResponse) {
             return $administrator;
-        }
-        $csrfFailure = $this->csrf->requireValidToken($requestId, $server);
-        if ($csrfFailure !== null) {
-            return $csrfFailure;
         }
         if (!$this->isJson($server['CONTENT_TYPE'] ?? null)) {
             return JsonResponse::error('UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json.', $requestId, 415);

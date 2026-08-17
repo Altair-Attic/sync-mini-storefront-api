@@ -4,14 +4,14 @@ Categories provide optional storefront navigation for products. Category IDs are
 
 ## Endpoints
 
-| Method | Path | Authentication | CSRF | Content type |
+| Method | Path | Authentication | Content type |
 |---|---|---|---|---|
 | GET | `/api/v1/categories` | None | No | — |
-| GET | `/api/v1/admin/categories` | Admin session | No | — |
-| POST | `/api/v1/admin/categories` | Admin session | Yes | `application/json` |
-| GET | `/api/v1/admin/categories/{id}` | Admin session | No | — |
-| PUT | `/api/v1/admin/categories/{id}` | Admin session | Yes | `application/json` |
-| DELETE | `/api/v1/admin/categories/{id}` | Admin session | Yes | — |
+| GET | `/api/v1/admin/categories` | Bearer JWT | — |
+| POST | `/api/v1/admin/categories` | Bearer JWT | `application/json` |
+| GET | `/api/v1/admin/categories/{id}` | Bearer JWT | — |
+| PUT | `/api/v1/admin/categories/{id}` | Bearer JWT | `application/json` |
+| DELETE | `/api/v1/admin/categories/{id}` | Bearer JWT | — |
 
 The public list contains active categories only and is sorted by `display_order` ascending, then `name` ascending. Admin listing includes active and inactive records and is bounded to 1,000 records for this single-store MVP.
 
@@ -29,4 +29,4 @@ POST and PUT are full representations. `name` is trimmed and must contain 2–10
 
 DELETE is idempotent deactivation: it sets `is_active=false` and never removes the row. It does not deactivate assigned products. Active products assigned to an inactive category remain public, but their public product response has `category: null`; admin responses retain the assignment. An inactive category cannot receive a new product assignment.
 
-Errors use the standard envelope. Relevant codes are `UNAUTHENTICATED`, `CSRF_TOKEN_INVALID`, `UNSUPPORTED_MEDIA_TYPE`, `VALIDATION_FAILED`, `CATEGORY_NOT_FOUND`, `CATEGORY_SLUG_CONFLICT`, and `INTERNAL_ERROR`.
+Errors use the standard envelope. Relevant codes are `UNAUTHENTICATED`, `UNSUPPORTED_MEDIA_TYPE`, `VALIDATION_FAILED`, `CATEGORY_NOT_FOUND`, `CATEGORY_SLUG_CONFLICT`, and `INTERNAL_ERROR`.

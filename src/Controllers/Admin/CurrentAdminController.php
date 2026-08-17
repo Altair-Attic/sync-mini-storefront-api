@@ -11,5 +11,6 @@ use ProjectSync\Middleware\AuthenticationMiddleware;
 final readonly class CurrentAdminController
 {
     public function __construct(private AuthenticationMiddleware $authentication) {}
-    public function me(string $requestId): HttpResponse { $result = $this->authentication->requireAdministrator($requestId); return $result instanceof HttpResponse ? $result : JsonResponse::success(['user' => $result], $requestId); }
+    /** @param array<string, mixed> $server */
+    public function me(string $requestId, array $server): HttpResponse { $result = $this->authentication->requireAdministrator($requestId, $server); return $result instanceof HttpResponse ? $result : JsonResponse::success(['administrator' => $result], $requestId); }
 }

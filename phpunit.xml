@@ -8,6 +8,13 @@
     <php>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="RUN_DB_INTEGRATION_TESTS" value="1" force="true"/>
+        <env name="APP_URL" value="http://localhost:8000" force="true"/>
+        <env name="JWT_SECRET" value="phpunit-jwt-secret-with-at-least-32-bytes" force="true"/>
+        <env name="JWT_ISSUER" value="http://localhost:8000" force="true"/>
+        <env name="JWT_AUDIENCE" value="http://localhost:8000/admin" force="true"/>
+        <env name="JWT_ALGORITHM" value="HS256" force="true"/>
+        <env name="REFRESH_COOKIE_SECURE" value="false" force="true"/>
+        <env name="REFRESH_TOKEN_SECURITY_SECRET" value="phpunit-refresh-secret-with-at-least-32-bytes" force="true"/>
     </php>
     <testsuites>
         <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>

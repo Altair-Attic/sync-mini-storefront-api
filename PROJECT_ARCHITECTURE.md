@@ -309,6 +309,8 @@ Rules:
 - Central Sync URL.
 - Unique site-reporting secret.
 - Logging level.
+- JWT issuer, audience, pinned algorithm, short access-token lifetime, and signing secret.
+- Refresh-token lifetime, host-only cookie settings, and a separate refresh-token hashing secret.
 
 Never expose backend secrets through React or commit real credentials.
 
@@ -375,6 +377,23 @@ last_login_at nullable
 created_at
 updated_at
 ```
+
+#### `admin_refresh_tokens`
+
+```text
+id
+merchant_user_id foreign key
+token_hash unique
+family_id
+expires_at
+last_used_at nullable
+revoked_at nullable
+replaced_by_token_id nullable
+created_at
+updated_at
+```
+
+Only an HMAC-SHA-256 hash is persisted. The raw token exists only in the administrator's refresh cookie. `family_id` supports logout and rotated-token reuse revocation; `replaced_by_token_id` preserves the rotation chain.
 
 #### `business_profiles`
 
@@ -589,8 +608,9 @@ The confirmation endpoint must use an unguessable access token or another approv
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/admin/login` | Create merchant session |
-| `POST` | `/api/v1/admin/logout` | Terminate merchant session |
+| `POST` | `/api/v1/admin/login` | Issue administrator access and refresh credentials |
+| `POST` | `/api/v1/admin/refresh` | Rotate refresh credential and issue a new access token |
+| `POST` | `/api/v1/admin/logout` | Revoke the current refresh-token family |
 | `GET` | `/api/v1/admin/me` | Current merchant user |
 | `GET` | `/api/v1/admin/products` | Paginated product list |
 | `POST` | `/api/v1/admin/products` | Create product |
@@ -640,20 +660,26 @@ Never trust prices, totals, availability or payment status submitted by React.
 
 ## 17. Merchant authentication
 
-Preferred v1 approach: same-origin server-side sessions.
+Approved v1 approach: short-lived JWT administrator access tokens with rotating opaque refresh tokens.
 
 Requirements:
 
 - Use `password_hash()` and `password_verify()`.
-- Regenerate the session ID after login.
-- Use `Secure`, `HttpOnly` and appropriate `SameSite` cookie attributes.
-- Require CSRF protection for state-changing requests.
+- Return a signed JWT access token after login and refresh; default expiry is 15 minutes.
+- Keep access tokens in frontend memory and send them only as `Authorization: Bearer <access-token>`.
+- Never store access tokens in `localStorage`, `sessionStorage`, or backend-managed cookies.
+- Pin the JWT algorithm in trusted configuration and validate signature, issuer, audience, subject, timestamps, JWT ID and token version.
+- Put no name, email, business information, password data, or sensitive personal data in a JWT.
+- Use cryptographically random opaque refresh tokens in Secure, `HttpOnly`, host-only cookies with `SameSite=Strict` preferred.
+- Store only HMAC-SHA-256 refresh-token hashes in MySQL using a secret distinct from the JWT signing secret.
+- Rotate refresh tokens after every successful use. Reuse of a rotated token revokes its complete family.
+- Validate same-origin browser requests on login, refresh and logout.
 - Rate-limit login attempts.
 - Use generic invalid-login messages.
-- Terminate sessions securely during logout.
+- Revoke the current refresh-token family and expire its cookie during logout.
 - Protect every merchant endpoint with middleware.
 
-Do not use a JWT solely because the frontend uses React. Reconsider only if deployment topology makes same-origin sessions impossible.
+JWT was selected by product-owner approval to give the React administrator a short-lived explicit bearer credential while retaining a same-origin, browser-protected renewal mechanism. Customers remain unauthenticated and no public administrator registration exists.
 
 ## 18. Product-image handling
 
@@ -720,7 +746,7 @@ The exact grace-period behaviour requires PM and operations approval.
 
 - PDO prepared statements only.
 - Output encoding against XSS.
-- CSRF protection for cookie-authenticated state changes.
+- Strict origin validation for refresh-cookie operations and any remaining cookie-authenticated state changes.
 - Authentication and authorization middleware.
 - Login and checkout rate limits.
 - Strict server-side input validation.
@@ -809,7 +835,7 @@ Track at minimum:
 - Browse products -> add to cart -> checkout -> confirmation.
 - Merchant login -> create product -> edit -> deactivate.
 - Merchant order list -> details -> valid status transition.
-- Invalid and expired merchant session behaviour.
+- Invalid and expired administrator access-token behaviour, refresh rotation, and rotated-token reuse.
 
 ### Mandatory checkout regression cases
 
@@ -1070,7 +1096,7 @@ Deliverables:
 | ID | Decision | Owner | Required by |
 |---|---|---|---|
 | D1 | Approve routing, validation, logging, email and testing packages | Backend + PM | Phase 1 |
-| D2 | Confirm same-origin session-cookie authentication | Backend + frontend | API contract |
+| D2 | Resolved 14 August 2026: short-lived JWT administrator access tokens with rotating opaque refresh-token cookies | Backend + frontend | API contract |
 | D3 | Resolved 13 August 2026: pickup is free; delivery uses one administrator-configured fixed fee in integer kobo | PM | Checkout |
 | D4 | Define allowed order statuses and transitions | PM + operations | Merchant order management |
 | D5 | Resolved 13 August 2026: concise server-built order summary sent to the normalized digits-only business number through a `wa.me` handoff URL | PM | Checkout integration |

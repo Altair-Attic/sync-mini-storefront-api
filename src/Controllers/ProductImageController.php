@@ -11,7 +11,6 @@ use ProjectSync\Infrastructure\HttpResponse;
 use ProjectSync\Infrastructure\JsonResponse;
 use ProjectSync\Infrastructure\RequestParser;
 use ProjectSync\Middleware\AuthenticationMiddleware;
-use ProjectSync\Middleware\CsrfMiddleware;
 use ProjectSync\Services\ProductImageService;
 
 final readonly class ProductImageController
@@ -20,7 +19,6 @@ final readonly class ProductImageController
     public function __construct(
         private ProductImageService $images,
         private AuthenticationMiddleware $authentication,
-        private CsrfMiddleware $csrf,
         private Closure $readFiles,
     ) {
     }
@@ -31,13 +29,9 @@ final readonly class ProductImageController
      */
     public function upload(string $requestId, array $server, array $route): HttpResponse
     {
-        $administrator = $this->authentication->requireAdministrator($requestId);
+        $administrator = $this->authentication->requireAdministrator($requestId, $server);
         if ($administrator instanceof HttpResponse) {
             return $administrator;
-        }
-        $csrfFailure = $this->csrf->requireValidToken($requestId, $server);
-        if ($csrfFailure !== null) {
-            return $csrfFailure;
         }
         if (!RequestParser::isContentType($server, 'multipart/form-data')) {
             return JsonResponse::error('UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be multipart/form-data.', $requestId, 415);

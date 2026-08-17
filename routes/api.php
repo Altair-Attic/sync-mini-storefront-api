@@ -22,8 +22,8 @@ return static function (HealthController $health, AuthController $auth, CurrentA
         $router->addRoute('GET', '/api/v1/products/{slug}', [$products, 'publicShow']);
         $router->addRoute('POST', '/api/v1/orders', [$orders, 'create']);
         $router->addRoute('GET', '/api/v1/orders/{reference}/confirmation', [$confirmations, 'show']);
-        $router->addRoute('GET', '/api/v1/admin/csrf-token', [$auth, 'csrf']);
         $router->addRoute('POST', '/api/v1/admin/login', [$auth, 'login']);
+        $router->addRoute('POST', '/api/v1/admin/refresh', [$auth, 'refresh']);
         $router->addRoute('GET', '/api/v1/admin/me', [$current, 'me']);
         $router->addRoute('GET', '/api/v1/admin/profile', [$profile, 'admin']);
         $router->addRoute('PUT', '/api/v1/admin/profile', [$profile, 'update']);

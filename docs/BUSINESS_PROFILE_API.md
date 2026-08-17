@@ -1,6 +1,6 @@
 # Business Profile API
 
-All endpoints use the standard JSON envelope and return a `meta.request_id`. Administrator endpoints use the existing same-origin PHP session. `PUT` additionally requires the current CSRF token in `X-CSRF-Token` and an `application/json` content type; media-type parameters such as `charset=utf-8` are accepted.
+All endpoints use the standard JSON envelope and return a `meta.request_id`. Administrator endpoints require `Authorization: Bearer <access-token>`. `PUT` requires an `application/json` content type; media-type parameters such as `charset=utf-8` are accepted.
 
 The machine-readable contract is in `docs/business-profile.openapi.yaml`.
 
@@ -12,7 +12,7 @@ Returns `404 BUSINESS_PROFILE_NOT_FOUND` until onboarding creates the profile.
 
 ## `GET /api/v1/admin/profile`
 
-Requires an active administrator session. Returns `data.profile` with the editable fields, including private notification settings, plus immutable identity and audit metadata: `id`, `slug`, `domain`, `created_at`, and `updated_at`. Timestamps use UTC RFC 3339 values such as `2026-08-13T12:00:00Z`. It does not return SMTP credentials, password information, or secrets.
+Requires an active administrator Bearer token. Returns `data.profile` with the editable fields, including private notification settings, plus immutable identity and audit metadata: `id`, `slug`, `domain`, `created_at`, and `updated_at`. Timestamps use UTC RFC 3339 values such as `2026-08-13T12:00:00Z`. It does not return SMTP credentials, password information, or secrets.
 
 Returns `401 UNAUTHENTICATED` without an active administrator and `404 BUSINESS_PROFILE_NOT_FOUND` when onboarding is incomplete.
 
@@ -57,4 +57,4 @@ Validation and normalization:
 
 `order_notification_email` and the enabled switches are private and never appear in `GET /api/v1/store`.
 
-Errors are `401 UNAUTHENTICATED`, `403 CSRF_TOKEN_INVALID`, `415 UNSUPPORTED_MEDIA_TYPE`, `422 VALIDATION_FAILED`, `404 BUSINESS_PROFILE_NOT_FOUND`, or the production-safe `500 INTERNAL_ERROR` envelope. Validation errors contain only field-level safe messages.
+Errors are `401 UNAUTHENTICATED`, `415 UNSUPPORTED_MEDIA_TYPE`, `422 VALIDATION_FAILED`, `404 BUSINESS_PROFILE_NOT_FOUND`, or the production-safe `500 INTERNAL_ERROR` envelope. Validation errors contain only field-level safe messages.
