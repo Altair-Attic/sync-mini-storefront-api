@@ -56,7 +56,7 @@ final class AdminOrderApiTest extends TestCase
         $this->db->exec('ALTER TABLE notification_jobs MODIFY recipient_type VARCHAR(32) NOT NULL');
 
         // Seed admin user
-        $this->db->prepare('DELETE FROM merchant_users WHERE id = :id')->execute(['id' => self::ADMIN_ID]);
+        $this->db->prepare('DELETE FROM merchant_users WHERE id = :id OR email = \'admin@example.com\'')->execute(['id' => self::ADMIN_ID]);
         $this->db->prepare('INSERT INTO merchant_users (id, name, email, password_hash, status, created_at, updated_at) VALUES (:id, \'Admin Owner\', \'admin@example.com\', \'$2y$10$dummy\', \'active\', UTC_TIMESTAMP(), UTC_TIMESTAMP())')->execute(['id' => self::ADMIN_ID]);
 
         // Seed business profile
@@ -121,13 +121,16 @@ final class AdminOrderApiTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->db->exec('DELETE FROM payment_events');
+        $this->db->exec('DELETE FROM payment_attempts');
         $this->db->exec('DELETE FROM order_status_history');
         $this->db->exec('DELETE FROM notification_jobs');
         $this->db->exec('DELETE FROM order_items');
         $this->db->exec('DELETE FROM orders');
         $this->db->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $this->productId]);
-        $this->db->prepare('DELETE FROM merchant_users WHERE id = :id')->execute(['id' => self::ADMIN_ID]);
+        $this->db->prepare('DELETE FROM merchant_users WHERE id = :id OR email = \'admin@example.com\'')->execute(['id' => self::ADMIN_ID]);
     }
+
 
     public function testAdminOrderRoutesRequireAuthentication(): void
     {

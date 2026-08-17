@@ -1,0 +1,195 @@
+openapi: 3.0.3
+info:
+  title: Project Sync Payment API
+  version: 1.0.0
+  description: Server-authoritative Paystack payment processing, webhook verification, and S2S reconciliation API.
+paths:
+  /api/v1/orders/{reference}/payments:
+    post:
+      summary: Initialize Paystack Payment Attempt
+      description: Initializes a server-authoritative Paystack payment transaction for an active, unpaid order.
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+            example: SYNC-2026-ABC123
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            example: idem-order-pay-998877665544
+        - name: X-Confirmation-Token
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Payment attempt initialized successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      payment_reference:
+                        type: string
+                        example: PAY-SYNC-9AB4C3D2E1F0G8H7J6K5
+                      authorization_url:
+                        type: string
+                        example: https://checkout.paystack.com/access12345
+                      access_code:
+                        type: string
+                        example: access12345
+                      status:
+                        type: string
+                        example: pending
+                      expected_amount_kobo:
+                        type: integer
+                        example: 250000
+                      currency:
+                        type: string
+                        example: NGN
+                  meta:
+                    type: object
+                    properties:
+                      idempotent_replay:
+                        type: boolean
+                        example: false
+        '200':
+          description: Idempotent replay of previously initialized attempt
+        '401':
+          description: Missing or invalid order confirmation token
+        '409':
+          description: Order is already paid or completed
+        '422':
+          description: Order is cancelled or invalid total
+
+  /api/v1/orders/{reference}/payments/{paymentReference}:
+    get:
+      summary: Get Payment Attempt Status
+      description: Read-only guest endpoint to poll local payment attempt state.
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: paymentReference
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-Confirmation-Token
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current payment attempt status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      payment_reference:
+                        type: string
+                      order_reference:
+                        type: string
+                      status:
+                        type: string
+                        enum: [initialized, pending, successful, failed, abandoned]
+                      payment_status:
+                        type: string
+                        enum: [unpaid, pending, paid, refunded]
+                      amount_kobo:
+                        type: integer
+                      currency:
+                        type: string
+                      resolution_status:
+                        type: string
+                        enum: [none, requires_action]
+
+  /api/v1/payments/paystack/webhook:
+    post:
+      summary: Paystack Webhook Handler
+      description: Public cryptographically verified webhook handler using HMAC-SHA512 with x-paystack-signature.
+      parameters:
+        - name: x-paystack-signature
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Webhook processed or safely ignored
+        '401':
+          description: Invalid cryptographic signature
+        '400':
+          description: Malformed JSON payload or missing reference
+
+  /api/v1/admin/orders/{orderId}/payments:
+    get:
+      summary: List Payment Attempts for Order (Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of payment attempts and audit events for order
+        '401':
+          description: Unauthenticated
+
+  /api/v1/admin/orders/{orderId}/payments/{paymentId}/reconcile:
+    post:
+      summary: Trigger S2S Reconciliation with Paystack (Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reconciliation outcome
+        '401':
+          description: Unauthenticated
+        '502':
+          description: Provider verification unavailable

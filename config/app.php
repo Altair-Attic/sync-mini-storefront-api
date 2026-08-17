@@ -66,4 +66,9 @@ return [
         'batch_limit' => (int) $env('NOTIFICATION_BATCH_LIMIT', '50'),
         'security_secret' => $env('NOTIFICATION_SECURITY_SECRET', $env('ORDER_SECURITY_SECRET', $env('RATE_LIMIT_SECRET'))),
     ],
+    'paystack' => [
+        'secret_key' => $env('PAYSTACK_SECRET_KEY', ''),
+        'base_url' => $env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
+        'timeout_seconds' => (int) $env('PAYSTACK_TIMEOUT_SECONDS', '10'),
+    ],
 ];

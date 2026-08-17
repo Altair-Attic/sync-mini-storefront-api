@@ -4,52 +4,64 @@ declare(strict_types=1);
 
 namespace ProjectSync\Infrastructure;
 
-use ProjectSync\Controllers\HealthController;
-use ProjectSync\Controllers\BusinessProfileController;
-use ProjectSync\Controllers\CategoryController;
-use ProjectSync\Controllers\ProductController;
-use ProjectSync\Controllers\ProductImageController;
-use ProjectSync\Controllers\OrderController;
-use ProjectSync\Controllers\OrderConfirmationController;
+use ProjectSync\Controllers\Admin\AdminPaymentController;
 use ProjectSync\Controllers\Admin\AuthController;
 use ProjectSync\Controllers\Admin\CurrentAdminController;
 use ProjectSync\Controllers\Admin\OrderManagementController;
+use ProjectSync\Controllers\BusinessProfileController;
+use ProjectSync\Controllers\CategoryController;
+use ProjectSync\Controllers\HealthController;
+use ProjectSync\Controllers\OrderConfirmationController;
+use ProjectSync\Controllers\OrderController;
+use ProjectSync\Controllers\PaymentController;
+use ProjectSync\Controllers\PaymentWebhookController;
+use ProjectSync\Controllers\ProductController;
+use ProjectSync\Controllers\ProductImageController;
 use ProjectSync\Infrastructure\Auth\JwtService;
 use ProjectSync\Infrastructure\Auth\RefreshCookie;
 use ProjectSync\Infrastructure\Auth\SameOriginPolicy;
-use ProjectSync\Middleware\CorsMiddleware;
+use ProjectSync\Infrastructure\Paystack\CurlPaystackHttpTransport;
+use ProjectSync\Infrastructure\Paystack\PaystackClient;
 use ProjectSync\Middleware\AuthenticationMiddleware;
+use ProjectSync\Middleware\CorsMiddleware;
 use ProjectSync\Middleware\RequestIdMiddleware;
-use ProjectSync\Repositories\LoginAttemptRepository;
 use ProjectSync\Repositories\AdminRefreshTokenRepository;
-use ProjectSync\Repositories\RevokedAccessTokenRepository;
 use ProjectSync\Repositories\BusinessProfileRepository;
 use ProjectSync\Repositories\CategoryRepository;
-use ProjectSync\Repositories\ProductRepository;
+use ProjectSync\Repositories\LoginAttemptRepository;
 use ProjectSync\Repositories\MerchantUserRepository;
 use ProjectSync\Repositories\OrderItemRepository;
 use ProjectSync\Repositories\OrderRepository;
 use ProjectSync\Repositories\OrderStatusHistoryRepository;
+use ProjectSync\Repositories\PaymentAttemptRepository;
+use ProjectSync\Repositories\PaymentEventRepository;
+use ProjectSync\Repositories\ProductRepository;
+use ProjectSync\Repositories\RevokedAccessTokenRepository;
 use ProjectSync\Services\AuthenticationService;
-use ProjectSync\Services\LoginRateLimiter;
 use ProjectSync\Services\BusinessProfileService;
 use ProjectSync\Services\CategoryService;
-use ProjectSync\Services\ProductImageService;
-use ProjectSync\Services\ProductService;
 use ProjectSync\Services\CheckoutRateLimiter;
 use ProjectSync\Services\CheckoutService;
-use ProjectSync\Services\OrderManagementService;
+use ProjectSync\Services\LoginRateLimiter;
 use ProjectSync\Services\OrderConfirmationTokenService;
+use ProjectSync\Services\OrderManagementService;
 use ProjectSync\Services\OrderReferenceGenerator;
+use ProjectSync\Services\PaymentFinalizationService;
+use ProjectSync\Services\PaymentRateLimiter;
+use ProjectSync\Services\PaymentReferenceGenerator;
+use ProjectSync\Services\PaymentService;
+use ProjectSync\Services\ProductImageService;
+use ProjectSync\Services\ProductService;
 use ProjectSync\Validators\BusinessProfileValidator;
 use ProjectSync\Validators\CategoryValidator;
+use ProjectSync\Validators\CheckoutValidator;
 use ProjectSync\Validators\LoginValidator;
 use ProjectSync\Validators\OrderListQueryValidator;
 use ProjectSync\Validators\OrderStatusUpdateValidator;
+use ProjectSync\Validators\PaymentInitializationValidator;
 use ProjectSync\Validators\ProductImageValidator;
 use ProjectSync\Validators\ProductListQueryValidator;
 use ProjectSync\Validators\ProductValidator;
-use ProjectSync\Validators\CheckoutValidator;
 
 final class AppFactory
 {
@@ -81,7 +93,10 @@ final class AppFactory
             'auth.refresh_cookie_same_site' => $app['authentication']['refresh_cookie_same_site'],
             'auth.refresh_token_security_secret' => $app['authentication']['refresh_token_security_secret'],
             'auth.application_origin' => $app['authentication']['application_origin'],
-            'login.max_attempts' => (string) $app['login']['max_attempts'], 'login.window_seconds' => (string) $app['login']['window_seconds'], 'login.block_seconds' => (string) $app['login']['block_seconds'], 'login.rate_limit_secret' => $app['login']['rate_limit_secret'],
+            'login.max_attempts' => (string) $app['login']['max_attempts'],
+            'login.window_seconds' => (string) $app['login']['window_seconds'],
+            'login.block_seconds' => (string) $app['login']['block_seconds'],
+            'login.rate_limit_secret' => $app['login']['rate_limit_secret'],
             'product_images.max_bytes' => (string) $app['product_images']['max_bytes'],
             'product_images.max_width' => (string) $app['product_images']['max_width'],
             'product_images.max_height' => (string) $app['product_images']['max_height'],
@@ -110,9 +125,13 @@ final class AppFactory
             'notifications.processing_timeout_seconds' => (string) $app['notifications']['processing_timeout_seconds'],
             'notifications.batch_limit' => (string) $app['notifications']['batch_limit'],
             'notifications.security_secret' => $app['notifications']['security_secret'],
+            'paystack.secret_key' => $app['paystack']['secret_key'] ?? '',
+            'paystack.base_url' => $app['paystack']['base_url'] ?? 'https://api.paystack.co',
+            'paystack.timeout_seconds' => (string) ($app['paystack']['timeout_seconds'] ?? '10'),
         ]);
         $config->allowedString('app.environment', ['local', 'testing', 'staging', 'production']);
         self::validateAuthenticationConfig($config);
+        self::validatePaystackConfig($config);
         LoggerFactory::assertValidLevel($config->requiredString('app.log_level'));
         (new DatabaseConnection($config))->validate();
         $logger = LoggerFactory::create($root . '/storage/logs/application.log', $app['log_level']);
@@ -203,6 +222,7 @@ final class AppFactory
         $orderRepository = new OrderRepository($connection);
         $orderItems = new OrderItemRepository($connection);
         $notificationService = NotificationFactory::service($connection, $config, $logger);
+        $confirmationTokens = new OrderConfirmationTokenService($config->requiredString('checkout.security_secret'));
         $checkoutService = new CheckoutService(
             $connection,
             new BusinessProfileRepository($connection),
@@ -210,7 +230,7 @@ final class AppFactory
             $orderRepository,
             $orderItems,
             new OrderReferenceGenerator(),
-            new OrderConfirmationTokenService($config->requiredString('checkout.security_secret')),
+            $confirmationTokens,
             (int) $config->requiredString('checkout.max_total_kobo'),
             $notificationService,
         );
@@ -246,6 +266,57 @@ final class AppFactory
             },
         );
 
+        // Payment Processing Infrastructure (Phase 6B)
+        $paymentAttempts = new PaymentAttemptRepository($connection);
+        $paymentEvents = new PaymentEventRepository($connection);
+        $paystackTransport = new CurlPaystackHttpTransport();
+        $paystackClient = new PaystackClient(
+            secretKey: $config->string('paystack.secret_key'),
+            baseUrl: $config->requiredString('paystack.base_url'),
+            timeoutSeconds: (int) $config->requiredString('paystack.timeout_seconds'),
+            transport: $paystackTransport,
+            logger: $logger,
+        );
+        $paymentReferenceGenerator = new PaymentReferenceGenerator();
+        $paymentFinalizer = new PaymentFinalizationService(
+            db: $connection,
+            attempts: $paymentAttempts,
+            events: $paymentEvents,
+            notifications: $notificationService,
+            logger: $logger,
+        );
+        $paymentService = new PaymentService(
+            db: $connection,
+            orders: $orderRepository,
+            attempts: $paymentAttempts,
+            events: $paymentEvents,
+            paystack: $paystackClient,
+            finalizer: $paymentFinalizer,
+            tokens: $confirmationTokens,
+            references: $paymentReferenceGenerator,
+            securitySecret: $config->requiredString('checkout.security_secret'),
+            logger: $logger,
+        );
+        $paymentRateLimiter = new PaymentRateLimiter($attempts, $config);
+        $paymentValidator = new PaymentInitializationValidator((int) $config->requiredString('checkout.idempotency_key_max_length'));
+        $paymentController = new PaymentController($paymentService, $paymentValidator, $paymentRateLimiter);
+        $paymentWebhookController = new PaymentWebhookController(
+            payments: $paymentService,
+            readRawBody: static function (): string {
+                $body = file_get_contents('php://input');
+
+                return is_string($body) ? $body : '';
+            },
+        );
+        $adminPaymentController = new AdminPaymentController(
+            auth: $authenticationMiddleware,
+            orders: $orderRepository,
+            attempts: $paymentAttempts,
+            events: $paymentEvents,
+            payments: $paymentService,
+            rateLimiter: $paymentRateLimiter,
+        );
+
         return new Application(
             config: $config,
             logger: $logger,
@@ -260,6 +331,9 @@ final class AppFactory
                 $orderController,
                 $confirmationController,
                 $orderManagementController,
+                $paymentController,
+                $paymentWebhookController,
+                $adminPaymentController,
             ),
             middleware: [new RequestIdMiddleware(), new CorsMiddleware($config->stringList('cors.allowed_origins'))],
         );
@@ -303,6 +377,27 @@ final class AppFactory
             }
             if (!str_starts_with($config->requiredString('auth.application_origin'), 'https://')) {
                 throw new \ProjectSync\Exceptions\ConfigurationException('Production APP_URL must use HTTPS.');
+            }
+        }
+    }
+
+    private static function validatePaystackConfig(Config $config): void
+    {
+        $environment = $config->requiredString('app.environment');
+        $secretKey = $config->string('paystack.secret_key');
+        $baseUrl = $config->requiredString('paystack.base_url');
+        $timeout = (int) $config->requiredString('paystack.timeout_seconds');
+
+        if ($timeout < 1 || $timeout > 60) {
+            throw new \ProjectSync\Exceptions\ConfigurationException('Paystack timeout configuration must be between 1 and 60 seconds.');
+        }
+
+        if ($environment === 'production') {
+            if ($secretKey === '' || !str_starts_with($secretKey, 'sk_live_') || str_contains(strtolower($secretKey), 'change-this')) {
+                throw new \ProjectSync\Exceptions\ConfigurationException('Production Paystack secret key must be configured with a live sk_live_ key.');
+            }
+            if (!str_starts_with($baseUrl, 'https://')) {
+                throw new \ProjectSync\Exceptions\ConfigurationException('Production Paystack base URL must use HTTPS.');
             }
         }
     }

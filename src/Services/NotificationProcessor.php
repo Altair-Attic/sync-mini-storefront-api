@@ -102,12 +102,12 @@ final readonly class NotificationProcessor
         }
         $order['items'] = $this->items->findByOrderId($this->string($order, 'id'));
         $recipientType = $job['recipient_type'] ?? null;
-        if ($recipientType === 'merchant') {
+        if ($recipientType === 'merchant' || $recipientType === 'merchant_payment_received' || $recipientType === 'merchant_late_payment_action') {
             if (($business['merchant_email_notifications_enabled'] ?? false) !== true) {
                 throw new EmailDeliveryException('NOTIFICATION_RECIPIENT_UNAVAILABLE');
             }
             $recipient = $business['order_notification_email'] ?? $business['support_email'] ?? null;
-        } elseif ($recipientType === 'customer' || (is_string($recipientType) && str_starts_with($recipientType, 'customer_status_'))) {
+        } elseif ($recipientType === 'customer' || $recipientType === 'customer_payment_confirmed' || (is_string($recipientType) && str_starts_with($recipientType, 'customer_status_'))) {
             if (($business['customer_email_notifications_enabled'] ?? false) !== true) {
                 throw new EmailDeliveryException('NOTIFICATION_RECIPIENT_UNAVAILABLE');
             }
@@ -122,6 +122,16 @@ final readonly class NotificationProcessor
         if ($recipientType === 'merchant') {
             return $this->emails->merchant($order, $business, $recipient);
         }
+        if ($recipientType === 'merchant_payment_received') {
+            return $this->emails->merchantPaymentReceived($order, $business, $recipient);
+        }
+        if ($recipientType === 'merchant_late_payment_action') {
+            return $this->emails->merchantLatePaymentAction($order, $business, $recipient);
+        }
+
+        if ($recipientType === 'customer_payment_confirmed') {
+            return $this->emails->customerPaymentConfirmed($order, $business, $recipient);
+        }
         if (str_starts_with($recipientType, 'customer_status_')) {
             $status = substr($recipientType, strlen('customer_status_'));
             return $this->emails->customerStatusUpdate($order, $business, $recipient, $status);
@@ -129,6 +139,7 @@ final readonly class NotificationProcessor
 
         return $this->emails->customer($order, $business, $recipient);
     }
+
 
     /** @param array<array-key, mixed> $values */
     private function string(array $values, string $key): string

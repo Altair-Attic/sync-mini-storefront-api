@@ -70,6 +70,68 @@ final class OrderEmailBuilder
 
     /**
      * @param array<string, mixed> $order
+     * @param array<string, mixed> $business
+     */
+    public function merchantPaymentReceived(array $order, array $business, string $recipient): EmailMessage
+    {
+        $lines = [
+            $this->string($business, 'business_name'),
+            'Payment received for order: ' . $this->string($order, 'reference'),
+            'Customer: ' . $this->string($order, 'customer_name'),
+            'Total paid: ' . $this->money($order['total_kobo'] ?? 0),
+            'Payment status: paid',
+        ];
+        $lines = array_merge($lines, $this->details($order, true));
+
+        return new EmailMessage($recipient, 'Payment received for order ' . $this->string($order, 'reference'), implode("\n", $lines));
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     * @param array<string, mixed> $business
+     */
+    public function customerPaymentConfirmed(array $order, array $business, string $recipient): EmailMessage
+    {
+        $lines = [
+            $this->string($business, 'business_name'),
+            'Payment confirmed for order: ' . $this->string($order, 'reference'),
+            'Customer: ' . $this->string($order, 'customer_name'),
+            'Total paid: ' . $this->money($order['total_kobo'] ?? 0),
+            'Payment status: paid',
+        ];
+        $lines = array_merge($lines, $this->details($order, false));
+        $contact = $business['support_email'] ?? null;
+        if (is_string($contact)) {
+            $lines[] = 'Business contact: ' . $contact;
+        }
+
+        return new EmailMessage($recipient, 'Payment confirmed for order ' . $this->string($order, 'reference'), implode("\n", $lines));
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     * @param array<string, mixed> $business
+     */
+    public function merchantLatePaymentAction(array $order, array $business, string $recipient): EmailMessage
+    {
+        $lines = [
+            $this->string($business, 'business_name'),
+            'URGENT: Payment received for CANCELLED order: ' . $this->string($order, 'reference'),
+            'Customer: ' . $this->string($order, 'customer_name'),
+            'Phone: ' . $this->string($order, 'phone_number'),
+            'Total paid: ' . $this->money($order['total_kobo'] ?? 0),
+            'Payment status: paid',
+            'Fulfilment status: cancelled (REQUIRES MANUAL ACTION - FULFIL OR REFUND)',
+        ];
+        $lines = array_merge($lines, $this->details($order, true));
+
+        return new EmailMessage($recipient, '[Action Required] Payment received for cancelled order ' . $this->string($order, 'reference'), implode("\n", $lines));
+    }
+
+
+
+    /**
+     * @param array<string, mixed> $order
      * @return list<string>
      */
     private function details(array $order, bool $includePrices): array

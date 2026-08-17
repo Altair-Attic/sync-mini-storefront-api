@@ -76,3 +76,14 @@ Status: approved for Phase 6.
 - Webhook Event Idempotency Without Assumed Event IDs: Event deduplication for `charge.success` is enforced via `UNIQUE(provider, event_type, provider_reference)` in `payment_events`, removing artificial assumptions about provider event IDs.
 - Persisted Late-Payment Operational State: When payment arrives for a cancelled order, `orders.fulfilment_status` remains `cancelled` (fail-closed), `orders.payment_status` becomes `paid` (financial truth), and `payment_attempts.resolution_status` and `payment_events.processing_status` are set to `requires_action` (`notes = 'payment_received_after_cancellation'`), ensuring the anomaly is permanently queryable in MySQL for merchant review/refund.
 - Backend Configuration Minimization: `PAYSTACK_PUBLIC_KEY` is omitted from backend requirements since server-side transaction initialization (`POST /transaction/initialize` via secret key) returns `authorization_url` and `access_code`. `PAYSTACK_SECRET_KEY` is validated with `sk_live_` in production. Detailed specifications in `docs/PAYMENTS.md` and `docs/PAYMENT_SECURITY.md`.
+
+## 2026-08-17 — Phase 6B Secure Paystack payment processing implementation
+
+Status: approved and implemented for Phase 6B.
+
+- Unified Transactional Finalization: Webhook processing (`POST /api/v1/payments/paystack/webhook`) and administrator S2S reconciliation (`POST /api/v1/admin/orders/{orderId}/payments/{paymentId}/reconcile`) route through a single, concurrency-safe `PaymentFinalizationService` using `SELECT ... FOR UPDATE` row locks.
+- Fail-Closed Late Payment Handling: A successful payment arriving for an already cancelled order marks `orders.payment_status = 'paid'` (financial truth) while keeping `orders.fulfilment_status = 'cancelled'`. The attempt is flagged with `resolution_status = 'requires_action'`, an audit event `payment_received_after_cancellation` is recorded, and an urgent `merchant_late_payment_action` notification is queued. Fulfilment is never automatically reopened.
+- Timing-Safe Cryptographic Signature Verification: Webhooks preserve raw request bytes directly from `php://input` prior to JSON decoding, validating `X-Paystack-Signature` against `PAYSTACK_SECRET_KEY` using HMAC-SHA512 and `hash_equals()`.
+- Financial Foreign Key Protection: Database migrations `202608170016` and `202608170017` enforce `ON DELETE RESTRICT` on `payment_attempts.order_id` and all `payment_events` foreign keys, preventing accidental physical erasure of financial audit records.
+- Order-Scoped Initialization Idempotency: Payment initialization requires `Idempotency-Key` (16–200 ASCII characters), enforce `UNIQUE(order_id, idempotency_key_hash)`, and guarantees exact replay safety while preventing cross-order collision.
+- Comprehensive Test Coverage: Unit, integration, migration, webhook security, business logic, and S2S reconciliation tests pass at 100% with PHPStan Level 9 strict typing and 0 Composer audit advisories.
