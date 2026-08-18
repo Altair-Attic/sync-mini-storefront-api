@@ -1,9 +1,38 @@
-RewriteEngine On
+# Project Sync Production .htaccess
+# Designed for cPanel shared hosting (Apache 2.4+)
 
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/.*$ index.php [QSA,L]
+# Disable directory browsing and MultiViews
+Options -Indexes -MultiViews
 
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [L]
+# Default Charset
+AddDefaultCharset UTF-8
+
+# Block access to hidden files (.env, .git, etc.) and sensitive configuration/source files
+<FilesMatch "(^\.|\.(env|sql|log|neon|lock|md|sh|dist|example|bak|config))$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Optional HTTPS Enforcement (Uncomment if not enforced at Cloudflare/cPanel edge)
+    # RewriteCond %{HTTPS} off
+    # RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Route API requests to PHP front controller
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^api/.*$ index.php [QSA,L]
+
+    # Route frontend client requests to index.html (SPA Fallback)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>

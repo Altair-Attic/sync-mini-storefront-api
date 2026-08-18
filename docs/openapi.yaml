@@ -59,7 +59,7 @@ paths:
       tags: [System]
       summary: Health check
       operationId: getHealth
-      description: Returns the operational status of the service and request metadata.
+      description: Returns the minimal operational liveness status of the service.
       responses:
         '200':
           description: Service is healthy
@@ -67,6 +67,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /health/ready:
+    get:
+      tags: [System]
+      summary: Readiness check
+      operationId: getReadiness
+      description: Returns the operational readiness of the service and local dependencies (database connectivity) without exposing credentials.
+      responses:
+        '200':
+          description: Service and dependencies are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          $ref: '#/components/responses/InternalError'
 
   # =========================================================================
   # Store & Business Profile (Public)
@@ -1420,14 +1436,32 @@ components:
           example: true
         data:
           type: object
-          required: [status, environment]
+          required: [status]
           properties:
             status:
               type: string
               example: ok
-            environment:
+        meta:
+          $ref: '#/components/schemas/SuccessMeta'
+
+    ReadinessResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+          example: true
+        data:
+          type: object
+          required: [status, database]
+          properties:
+            status:
               type: string
-              example: production
+              example: ready
+            database:
+              type: string
+              example: connected
         meta:
           $ref: '#/components/schemas/SuccessMeta'
 

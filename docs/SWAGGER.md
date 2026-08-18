@@ -23,7 +23,10 @@ The backend exposes interactive Swagger documentation and machine-readable OpenA
 
 As decided in [Architecture Decision 2026-08-18 (Phase 7)](file:///c:/Users/Davytun/Desktop/Altair_Attic/project-sync/api/docs/DECISIONS.md):
 
-- **Cross-Environment Availability**: Swagger UI and OpenAPI specification routes are enabled across all deployment environments (local development, testing, staging, and production per-merchant installations).
+- **Configurable Exposure (`API_DOCS_ENABLED`)**:
+  - Controlled via `API_DOCS_ENABLED=true|false` in `.env` (defaults to `true`).
+  - When enabled, Swagger UI and raw OpenAPI specs are accessible across all environments.
+  - When disabled (`API_DOCS_ENABLED=false`), all documentation routes (`/api/docs`, `/api/v1/docs`, `/api/openapi.yaml`, `/api/openapi.json`) return a standard HTTP 404 `NOT_FOUND` JSON error envelope.
 - **Zero Secret Exposure**:
   - The specification contains purely public API contracts and synthetic placeholder values.
   - Zero database passwords, SMTP credentials, JWT secrets, or Paystack secret keys (`sk_live_` / `sk_test_`) are ever served or embedded.
@@ -31,7 +34,7 @@ As decided in [Architecture Decision 2026-08-18 (Phase 7)](file:///c:/Users/Davy
 - **Secure Swagger UI Configuration**:
   - `persistAuthorization: false`: Bearer JWT tokens entered into Swagger UI are held only in browser memory and are immediately cleared when the page is reloaded.
   - `validatorUrl: null`: Disables third-party external network calls to `validator.swagger.io`.
-  - Security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`) are strictly enforced.
+  - Security headers (`X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`) are strictly enforced.
 
 ---
 
@@ -93,11 +96,16 @@ Public APIs (`/api/v1/store`, `/api/v1/categories`, `/api/v1/products`, `/api/v1
 ## 6. Maintaining & Updating the OpenAPI Specification
 
 1. **Source of Truth**: The canonical specification lives at `docs/openapi.yaml`.
-2. **Synchronizing JSON**: Whenever `docs/openapi.yaml` is modified, regenerate `docs/openapi.json`:
+2. **Synchronizing JSON (Pure PHP)**: Whenever `docs/openapi.yaml` is modified, regenerate `docs/openapi.json`:
    ```bash
-   cmd /c "chcp 65001 >nul && npx -y js-yaml docs/openapi.yaml > docs/openapi.json"
+   php scripts/generate-openapi-json.php
+   # Or via Composer shortcut:
+   composer openapi:generate
    ```
 3. **Run Validation & Contract Tests**:
+   ```bash
+   vendor/bin/phpunit tests/Integration/DocumentationEndpointTest.php tests/Integration/ProductionSwaggerPolicyTest.php tests/Contract/OpenApiSpecificationTest.php
+   ```
    ```bash
    vendor/bin/phpunit tests/Integration/DocumentationEndpointTest.php tests/Contract/OpenApiSpecificationTest.php
    ```

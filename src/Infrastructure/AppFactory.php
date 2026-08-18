@@ -75,6 +75,9 @@ final class AppFactory
             'app.environment' => $app['environment'],
             'app.debug' => $app['debug'],
             'app.log_level' => $app['log_level'],
+            'app.api_docs_enabled' => $app['api_docs_enabled'],
+            'app.hsts_enabled' => $app['hsts_enabled'],
+            'app.hsts_max_age' => (string) $app['hsts_max_age'],
             'cors.allowed_origins' => $cors['allowed_origins'],
             'db.host' => $database['host'],
             'db.port' => (string) $database['port'],
@@ -131,6 +134,7 @@ final class AppFactory
             'paystack.timeout_seconds' => (string) ($app['paystack']['timeout_seconds'] ?? '10'),
         ]);
         $config->allowedString('app.environment', ['local', 'testing', 'staging', 'production']);
+        self::validateProductionEnvironmentConfig($config);
         self::validateAuthenticationConfig($config);
         self::validatePaystackConfig($config);
         LoggerFactory::assertValidLevel($config->requiredString('app.log_level'));
@@ -322,7 +326,7 @@ final class AppFactory
             config: $config,
             logger: $logger,
             routes: $routes(
-                new HealthController(),
+                new HealthController($connection),
                 new AuthController($auth, new LoginValidator(), $refreshCookie, new SameOriginPolicy($config->requiredString('auth.application_origin')), $authenticationMiddleware, static function (): string { $body = file_get_contents('php://input'); return is_string($body) ? $body : ''; }),
                 new CurrentAdminController($authenticationMiddleware),
                 $profileController,
@@ -335,7 +339,7 @@ final class AppFactory
                 $paymentController,
                 $paymentWebhookController,
                 $adminPaymentController,
-                new DocumentationController($root),
+                new DocumentationController($root, $config->bool('app.api_docs_enabled')),
             ),
             middleware: [new RequestIdMiddleware(), new CorsMiddleware($config->stringList('cors.allowed_origins'))],
         );
@@ -400,6 +404,52 @@ final class AppFactory
             }
             if (!str_starts_with($baseUrl, 'https://')) {
                 throw new \ProjectSync\Exceptions\ConfigurationException('Production Paystack base URL must use HTTPS.');
+            }
+        }
+    }
+
+    private static function validateProductionEnvironmentConfig(Config $config): void
+    {
+        $environment = $config->requiredString('app.environment');
+        if ($environment !== 'production') {
+            return;
+        }
+
+        if ($config->bool('app.debug')) {
+            throw new \ProjectSync\Exceptions\ConfigurationException('Production environment must not have debug mode enabled (APP_DEBUG=false required).');
+        }
+
+        $appUrl = $config->requiredString('auth.application_origin');
+        if (!str_starts_with($appUrl, 'https://')) {
+            throw new \ProjectSync\Exceptions\ConfigurationException('Production APP_URL must use HTTPS.');
+        }
+
+        $dbHost = $config->requiredString('db.host');
+        $dbName = $config->requiredString('db.database');
+        $dbUser = $config->requiredString('db.username');
+        if ($dbHost === '' || $dbName === '' || $dbUser === '') {
+            throw new \ProjectSync\Exceptions\ConfigurationException('Production database configuration is incomplete.');
+        }
+
+        $checkoutSecret = $config->requiredString('checkout.security_secret');
+        $loginRateSecret = $config->requiredString('login.rate_limit_secret');
+        $notificationSecret = $config->requiredString('notifications.security_secret');
+        if (str_contains(strtolower($checkoutSecret), 'change-this')
+            || str_contains(strtolower($loginRateSecret), 'change-this')
+            || str_contains(strtolower($notificationSecret), 'change-this')
+            || strlen($checkoutSecret) < 16
+            || strlen($loginRateSecret) < 16
+            || strlen($notificationSecret) < 16
+        ) {
+            throw new \ProjectSync\Exceptions\ConfigurationException('Production security secrets must not use default placeholder values.');
+        }
+
+        if ($config->bool('mail.enabled')) {
+            $mailHost = $config->string('mail.host', '');
+            $mailUser = $config->string('mail.username', '');
+            $mailFrom = $config->string('mail.from_address', '');
+            if (trim($mailHost) === '' || trim($mailUser) === '' || trim($mailFrom) === '') {
+                throw new \ProjectSync\Exceptions\ConfigurationException('Production email configuration is incomplete while MAIL_ENABLED=true.');
             }
         }
     }

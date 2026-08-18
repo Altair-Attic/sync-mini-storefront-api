@@ -15,13 +15,38 @@ final readonly class MigrationRunner
     }
 
     /** @return list<string> */
-    public function run(): array
+    public function applied(): array
     {
         $this->connection->exec('CREATE TABLE IF NOT EXISTS schema_migrations (migration VARCHAR(255) NOT NULL PRIMARY KEY, batch INT UNSIGNED NOT NULL, executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-        $appliedStatement = $this->connection->prepare('SELECT migration FROM schema_migrations');
+        $appliedStatement = $this->connection->prepare('SELECT migration FROM schema_migrations ORDER BY migration ASC');
         $appliedStatement->execute();
         /** @var list<string> $applied */
         $applied = $appliedStatement->fetchAll(PDO::FETCH_COLUMN);
+
+        return $applied;
+    }
+
+    /** @return list<string> */
+    public function pending(): array
+    {
+        $applied = $this->applied();
+        $files = glob($this->migrationPath . '/*.php') ?: [];
+        sort($files, SORT_STRING);
+        $pending = [];
+        foreach ($files as $file) {
+            $migration = basename($file, '.php');
+            if (!in_array($migration, $applied, true)) {
+                $pending[] = $migration;
+            }
+        }
+
+        return $pending;
+    }
+
+    /** @return list<string> */
+    public function run(): array
+    {
+        $applied = $this->applied();
         $batchStatement = $this->connection->prepare('SELECT COALESCE(MAX(batch), 0) + 1 FROM schema_migrations');
         $batchStatement->execute();
         $batch = (int) $batchStatement->fetchColumn();

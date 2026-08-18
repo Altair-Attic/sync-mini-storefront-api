@@ -15,6 +15,7 @@ final class LoggerFactory
     {
         self::assertValidLevel($level);
         $logger = new Logger('project-sync');
+        $logger->pushProcessor(new LogRedactionProcessor());
         $logger->pushHandler(new StreamHandler($path, self::level($level)));
 
         return $logger;

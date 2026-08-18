@@ -9,6 +9,9 @@ return [
     'url' => $env('APP_URL'),
     'debug' => filter_var($env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOL),
     'log_level' => $env('LOG_LEVEL', 'info'),
+    'api_docs_enabled' => filter_var($env('API_DOCS_ENABLED', $env('APP_ENV', 'production') !== 'production' ? 'true' : 'false'), FILTER_VALIDATE_BOOL),
+    'hsts_enabled' => filter_var($env('HSTS_ENABLED', $env('APP_ENV', 'production') === 'production' ? 'true' : 'false'), FILTER_VALIDATE_BOOL),
+    'hsts_max_age' => (int) $env('HSTS_MAX_AGE', '31536000'),
     'authentication' => [
         'jwt_secret' => $env('JWT_SECRET'),
         'jwt_issuer' => $env('JWT_ISSUER', $env('APP_URL')),

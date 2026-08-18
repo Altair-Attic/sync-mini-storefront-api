@@ -60,6 +60,7 @@ return static function (
 
         // System
         $router->addRoute('GET', '/api/v1/health', $health);
+        $router->addRoute('GET', '/api/v1/health/ready', [$health, 'readiness']);
 
         // Store & Catalogue (Public)
         $router->addRoute('GET', '/api/v1/store', [$profile, 'store']);

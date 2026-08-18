@@ -11,6 +11,7 @@ final readonly class DocumentationController
 {
     public function __construct(
         private string $root,
+        private bool $enabled = true,
     ) {
     }
 
@@ -20,6 +21,10 @@ final readonly class DocumentationController
      */
     public function ui(string $requestId, array $server, array $params): HttpResponse
     {
+        if (!$this->enabled) {
+            return JsonResponse::error('NOT_FOUND', 'The requested resource was not found.', $requestId, 404);
+        }
+
         $indexPath = $this->root . '/public/docs/index.html';
         if (!is_file($indexPath)) {
             return JsonResponse::error('NOT_FOUND', 'Documentation UI not found.', $requestId, 404);
@@ -47,6 +52,10 @@ final readonly class DocumentationController
      */
     public function yaml(string $requestId, array $server, array $params): HttpResponse
     {
+        if (!$this->enabled) {
+            return JsonResponse::error('NOT_FOUND', 'The requested resource was not found.', $requestId, 404);
+        }
+
         $yamlPath = $this->root . '/docs/openapi.yaml';
         if (!is_file($yamlPath)) {
             return JsonResponse::error('NOT_FOUND', 'OpenAPI YAML specification not found.', $requestId, 404);
@@ -73,6 +82,10 @@ final readonly class DocumentationController
      */
     public function json(string $requestId, array $server, array $params): HttpResponse
     {
+        if (!$this->enabled) {
+            return JsonResponse::error('NOT_FOUND', 'The requested resource was not found.', $requestId, 404);
+        }
+
         $jsonPath = $this->root . '/docs/openapi.json';
         if (!is_file($jsonPath)) {
             return JsonResponse::error('NOT_FOUND', 'OpenAPI JSON specification not found.', $requestId, 404);

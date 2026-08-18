@@ -55,17 +55,19 @@ This produces: immediate attempt, then waits of 5, 15, 45, and 135 minutes befor
 
 ## cPanel cron and safe troubleshooting
 
-The processor is a bounded CLI command and needs no daemon, Redis, Supervisor, Docker, or persistent PHP process:
+The processor is a bounded CLI command and needs no daemon, Redis, Supervisor, Docker, or persistent PHP process. It incorporates non-blocking `flock(LOCK_EX | LOCK_NB)` file locking on `storage/locks/notification_worker.lock` to prevent overlapping runs:
 
-```text
-*/5 * * * * /usr/local/bin/php /absolute/project/path/bin/process-notifications.php --limit=20
+```cron
+* * * * * /usr/local/bin/php /home/username/project-sync-api/scripts/process-notifications.php --limit=20 >/dev/null 2>&1
 ```
 
-The PHP path depends on the cPanel host. `--limit` must be positive and cannot exceed `NOTIFICATION_BATCH_LIMIT`. Exit codes are:
-- `0`: clean execution, all claimed jobs succeeded or none were due.
-- `2`: invalid CLI arguments.
-- `3`: one or more deliveries failed and were scheduled for retry or marked failed safely.
-- `1`: unhandled bootstrap or database failure.
+The PHP CLI binary path depends on the cPanel host (e.g., `/usr/local/bin/php` or `/usr/bin/php`). Options:
+- `--limit`: Positive integer batch size, cannot exceed `NOTIFICATION_BATCH_LIMIT` (default 20).
+- Exit codes:
+  - `0`: Clean execution, all claimed jobs succeeded or none were due.
+  - `1`: Unhandled bootstrap, database failure, or lock contention.
+  - `2`: Invalid CLI arguments.
+  - `3`: One or more deliveries failed and were scheduled for retry or marked failed safely.
 
 Safe troubleshooting:
 - Output and logs contain only aggregate counts and stable error codes (such as `NOTIFICATION_DELIVERY_FAILED`, `NOTIFICATION_RECIPIENT_UNAVAILABLE`).

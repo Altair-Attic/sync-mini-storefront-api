@@ -142,6 +142,7 @@ final class OpenApiSpecificationTest extends TestCase
 
         $expectedEndpoints = [
             '/health' => ['get'],
+            '/health/ready' => ['get'],
             '/store' => ['get'],
             '/categories' => ['get'],
             '/products' => ['get'],
@@ -177,6 +178,24 @@ final class OpenApiSpecificationTest extends TestCase
                 $this->assertArrayHasKey($method, $pathItem, "Missing HTTP method {$method} for path {$path}");
             }
         }
+    }
+
+    public function testYamlAndJsonSpecificationsAreEquivalent(): void
+    {
+        $yamlPath = $this->root . '/docs/openapi.yaml';
+        $this->assertFileExists($yamlPath);
+
+        /** @var mixed $yamlParsed */
+        $yamlParsed = \Symfony\Component\Yaml\Yaml::parseFile($yamlPath);
+        $this->assertIsArray($yamlParsed);
+
+        $jsonPath = $this->root . '/docs/openapi.json';
+        $this->assertFileExists($jsonPath);
+
+        $jsonParsed = json_decode((string) file_get_contents($jsonPath), true);
+        $this->assertIsArray($jsonParsed);
+
+        $this->assertEquals($yamlParsed, $jsonParsed, 'OpenAPI JSON must be synchronized and equivalent with canonical YAML.');
     }
 
     public function testAllInternalSchemaRefsResolve(): void

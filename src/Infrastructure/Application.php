@@ -33,6 +33,7 @@ final readonly class Application
         $requestId = '';
         $method = 'GET';
         $uri = '/';
+        $origin = null;
         $startedAt = hrtime(true);
         $response = null;
         try {
@@ -69,6 +70,7 @@ final readonly class Application
                 $response = $handler($requestId, $server, $routeInfo[2]);
             }
 
+            $response = $this->withSecurityHeaders($response, $server);
             $response = $this->withCors($response, $origin);
 
             return $response;
@@ -76,6 +78,8 @@ final readonly class Application
             $requestId = $requestId !== '' ? $requestId : bin2hex(random_bytes(12));
             $this->logger->error('Unhandled API exception.', ['request_id' => $requestId, 'exception' => $exception]);
             $response = JsonResponse::error('INTERNAL_ERROR', 'An unexpected error occurred.', $requestId, 500);
+            $response = $this->withSecurityHeaders($response, $server);
+            $response = $this->withCors($response, $origin);
 
             return $response;
         } finally {
@@ -85,9 +89,38 @@ final readonly class Application
         }
     }
 
+    /** @param array<string, mixed> $server */
+    private function withSecurityHeaders(HttpResponse $response, array $server): HttpResponse
+    {
+        $headers = $response->headers;
+
+        if (!isset($headers['X-Content-Type-Options'])) {
+            $headers['X-Content-Type-Options'] = 'nosniff';
+        }
+        if (!isset($headers['X-Frame-Options'])) {
+            $headers['X-Frame-Options'] = 'SAMEORIGIN';
+        }
+        if (!isset($headers['Referrer-Policy'])) {
+            $headers['Referrer-Policy'] = 'strict-origin-when-cross-origin';
+        }
+
+        $proto = is_string($server['HTTP_X_FORWARDED_PROTO'] ?? null) ? strtolower((string) $server['HTTP_X_FORWARDED_PROTO']) : '';
+        $port = is_scalar($server['SERVER_PORT'] ?? null) ? (int) $server['SERVER_PORT'] : 0;
+        $isHttps = (isset($server['HTTPS']) && $server['HTTPS'] !== 'off')
+            || ($proto === 'https')
+            || ($port === 443);
+
+        if ($this->config->bool('app.hsts_enabled', false) && ($isHttps || $this->config->string('app.environment', 'local') === 'production')) {
+            $maxAge = (int) $this->config->string('app.hsts_max_age', '31536000');
+            $headers['Strict-Transport-Security'] = sprintf('max-age=%d; includeSubDomains', $maxAge);
+        }
+
+        return new HttpResponse($response->status, $headers, $response->body, $response->rawBody);
+    }
+
     private function withCors(HttpResponse $response, ?string $origin): HttpResponse
     {
-        if ($origin === null || !in_array($origin, $this->config->stringList('cors.allowed_origins'), true)) {
+        if ($origin === null || !in_array($origin, $this->config->stringList('cors.allowed_origins', []), true)) {
             return $response;
         }
 
@@ -105,7 +138,7 @@ final readonly class Application
         try {
             $this->logger->info('API request completed.', [
                 'request_id' => $requestId,
-                'environment' => $this->config->string('app.environment'),
+                'environment' => $this->config->string('app.environment', 'local'),
                 'route' => $uri,
                 'method' => $method,
                 'status_code' => $response->status,

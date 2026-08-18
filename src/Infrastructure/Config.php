@@ -14,9 +14,9 @@ final readonly class Config
     {
     }
 
-    public function string(string $key): string
+    public function string(string $key, ?string $default = null): string
     {
-        $value = $this->values[$key] ?? null;
+        $value = $this->values[$key] ?? $default;
         if (!is_string($value)) {
             throw new InvalidArgumentException(sprintf('Configuration value "%s" must be a string.', $key));
         }
@@ -24,9 +24,9 @@ final readonly class Config
         return $value;
     }
 
-    public function bool(string $key): bool
+    public function bool(string $key, ?bool $default = null): bool
     {
-        $value = $this->values[$key] ?? null;
+        $value = $this->values[$key] ?? $default;
         if (!is_bool($value)) {
             throw new InvalidArgumentException(sprintf('Configuration value "%s" must be a boolean.', $key));
         }
@@ -65,10 +65,13 @@ final readonly class Config
         return (int) $value;
     }
 
-    /** @return list<string> */
-    public function stringList(string $key): array
+    /**
+     * @param list<string>|null $default
+     * @return list<string>
+     */
+    public function stringList(string $key, ?array $default = null): array
     {
-        $value = $this->values[$key] ?? null;
+        $value = $this->values[$key] ?? $default;
         if (!is_array($value)) {
             throw new InvalidArgumentException(sprintf('Configuration value "%s" must be a string list.', $key));
         }
