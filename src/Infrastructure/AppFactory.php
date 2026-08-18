@@ -10,6 +10,7 @@ use ProjectSync\Controllers\Admin\CurrentAdminController;
 use ProjectSync\Controllers\Admin\OrderManagementController;
 use ProjectSync\Controllers\BusinessProfileController;
 use ProjectSync\Controllers\CategoryController;
+use ProjectSync\Controllers\DocumentationController;
 use ProjectSync\Controllers\HealthController;
 use ProjectSync\Controllers\OrderConfirmationController;
 use ProjectSync\Controllers\OrderController;
@@ -334,6 +335,7 @@ final class AppFactory
                 $paymentController,
                 $paymentWebhookController,
                 $adminPaymentController,
+                new DocumentationController($root),
             ),
             middleware: [new RequestIdMiddleware(), new CorsMiddleware($config->stringList('cors.allowed_origins'))],
         );

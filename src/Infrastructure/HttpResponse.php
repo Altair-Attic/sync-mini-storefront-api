@@ -14,6 +14,7 @@ final readonly class HttpResponse
         public int $status,
         public array $headers,
         public array $body,
+        public ?string $rawBody = null,
     ) {
     }
 }

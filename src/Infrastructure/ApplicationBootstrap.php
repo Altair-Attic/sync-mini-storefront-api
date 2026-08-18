@@ -54,6 +54,11 @@ final class ApplicationBootstrap
             return;
         }
 
+        if ($response->rawBody !== null) {
+            echo $response->rawBody;
+            return;
+        }
+
         try {
             echo json_encode($response->body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         } catch (Throwable) {

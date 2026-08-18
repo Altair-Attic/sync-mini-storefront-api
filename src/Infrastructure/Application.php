@@ -95,7 +95,7 @@ final readonly class Application
         $headers['Access-Control-Allow-Origin'] = $origin;
         $headers['Vary'] = 'Origin';
         $headers['Access-Control-Allow-Credentials'] = 'true';
-        return new HttpResponse($response->status, $headers, $response->body);
+        return new HttpResponse($response->status, $headers, $response->body, $response->rawBody);
     }
 
     private function logCompletion(string $requestId, string $method, string $uri, HttpResponse $response, int $startedAt): void

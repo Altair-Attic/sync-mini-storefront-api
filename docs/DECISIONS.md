@@ -87,3 +87,16 @@ Status: approved and implemented for Phase 6B.
 - Financial Foreign Key Protection: Database migrations `202608170016` and `202608170017` enforce `ON DELETE RESTRICT` on `payment_attempts.order_id` and all `payment_events` foreign keys, preventing accidental physical erasure of financial audit records.
 - Order-Scoped Initialization Idempotency: Payment initialization requires `Idempotency-Key` (16–200 ASCII characters), enforce `UNIQUE(order_id, idempotency_key_hash)`, and guarantees exact replay safety while preventing cross-order collision.
 - Comprehensive Test Coverage: Unit, integration, migration, webhook security, business logic, and S2S reconciliation tests pass at 100% with PHPStan Level 9 strict typing and 0 Composer audit advisories.
+
+## 2026-08-18 — Phase 7 Swagger API documentation and cross-environment exposure
+
+Status: approved and implemented for Phase 7.
+
+- **Canonical Specification**: `docs/openapi.yaml` (and UTF-8 `docs/openapi.json`) serves as the single authoritative OpenAPI 3.0.3 contract for all implemented Project Sync APIs. All domain-specific documentation files remain subordinate to this canonical definition.
+- **Self-Hosted Lightweight Distribution**: Swagger UI v5.18.2 distribution assets are self-hosted in `public/docs/`, satisfying cPanel shared-hosting compatibility without introducing external npm runtime dependencies or heavy PHP framework packages.
+- **Cross-Environment Exposure Strategy (Option A)**: Swagger UI (`GET /api/docs`, `GET /api/v1/docs`) and raw specification endpoints (`GET /api/openapi.yaml`, `GET /api/openapi.json`) are permanently available across all environments (local, staging, and production per-merchant installations). This decision was made because:
+  1. The API serves as the primary integration interface for headless frontend applications across diverse hosting domains.
+  2. The specification exposes strictly public schema definitions and synthetic example values; zero database credentials, SMTP passwords, JWT signing secrets, or Paystack secret keys (`sk_live_`) are ever disclosed.
+  3. Swagger UI is securely configured with `persistAuthorization: false` and `validatorUrl: null`, ensuring Bearer tokens remain strictly in browser runtime memory.
+- **Server Configuration**: Uses environment-neutral `/api/v1` base URLs, allowing seamless execution across any per-merchant subdomain or reverse-proxy without hardcoded hosts.
+- **Zero Trust Security Guardrails**: Prominent security warnings are embedded across payment endpoints asserting that client redirects and callbacks are non-authoritative. Provider webhooks are explicitly marked provider-only and require timing-safe HMAC-SHA512 cryptographic verification.
