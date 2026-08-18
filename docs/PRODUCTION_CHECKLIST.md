@@ -73,7 +73,7 @@ Use this checklist to verify every single-tenant merchant installation before op
 ## 7. OpenAPI Documentation Policy
 
 - [ ] **Swagger Policy Chosen**: `API_DOCS_ENABLED=true` (or `false` if merchant requires private API documentation).
-- [ ] **OpenAPI JSON Synchronized**: Generated via `php scripts/generate-openapi-json.php`.
+- [ ] **OpenAPI JSON Generated & Committed**: Generated before deployment/CI via `php scripts/generate-openapi-json.php` and committed to repository; production servers only serve static JSON.
 
 ---
 

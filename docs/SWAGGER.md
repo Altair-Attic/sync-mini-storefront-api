@@ -95,19 +95,18 @@ Public APIs (`/api/v1/store`, `/api/v1/categories`, `/api/v1/products`, `/api/v1
 
 ## 6. Maintaining & Updating the OpenAPI Specification
 
-1. **Source of Truth**: The canonical specification lives at `docs/openapi.yaml`.
-2. **Synchronizing JSON (Pure PHP)**: Whenever `docs/openapi.yaml` is modified, regenerate `docs/openapi.json`:
-   ```bash
-   php scripts/generate-openapi-json.php
-   # Or via Composer shortcut:
-   composer openapi:generate
-   ```
+1. **Source of Truth**: The canonical specification lives at [docs/openapi.yaml](file:///c:/Users/Davytun/Desktop/Altair_Attic/project-sync/api/docs/openapi.yaml).
+2. **Build-Time Generation & Commit Policy**:
+   - Generate [docs/openapi.json](file:///c:/Users/Davytun/Desktop/Altair_Attic/project-sync/api/docs/openapi.json) before deployment/CI and commit the generated file to version control:
+     ```bash
+     php scripts/generate-openapi-json.php
+     # Or via Composer script:
+     composer openapi:generate
+     ```
+   - **Production Isolation**: Production servers only serve the static `docs/openapi.json` (and `docs/openapi.yaml`) file directly. Dev dependencies (`symfony/yaml`) and YAML parsers are never required on live production environments.
 3. **Run Validation & Contract Tests**:
    ```bash
    vendor/bin/phpunit tests/Integration/DocumentationEndpointTest.php tests/Integration/ProductionSwaggerPolicyTest.php tests/Contract/OpenApiSpecificationTest.php
-   ```
-   ```bash
-   vendor/bin/phpunit tests/Integration/DocumentationEndpointTest.php tests/Contract/OpenApiSpecificationTest.php
    ```
 
 ---
