@@ -62,7 +62,6 @@ final class OrderApiTest extends TestCase
 
         $config = new Config([
             'app.environment' => 'testing', 'app.debug' => false, 'cors.allowed_origins' => [],
-            'checkout.security_secret' => str_repeat('api-contract-secret-', 3),
             'checkout.max_attempts' => '30', 'checkout.confirmation_max_attempts' => '20',
             'checkout.window_seconds' => '60', 'checkout.block_seconds' => '300',
         ]);
@@ -73,16 +72,16 @@ final class OrderApiTest extends TestCase
         $processor = new NotificationProcessor($jobs, $orders, $items, new BusinessProfileRepository($this->db), $failingSender, new OrderEmailBuilder(), new \Psr\Log\NullLogger(), 300, 900);
         $notifications = new NotificationService(
             new BusinessProfileRepository($this->db), $jobs, $processor, new WhatsAppHandoffService(),
-            new \Psr\Log\NullLogger(), str_repeat('api-notification-secret-', 3), 5, true,
+            new \Psr\Log\NullLogger(), 5, true,
         );
         $service = new CheckoutService(
             $this->db, new BusinessProfileRepository($this->db), new ProductRepository($this->db),
             $orders, $items, new OrderReferenceGenerator(),
-            new OrderConfirmationTokenService($config->requiredString('checkout.security_secret')), 4_294_967_295, $notifications,
+            new OrderConfirmationTokenService(), 4_294_967_295, $notifications,
         );
         $limiter = new CheckoutRateLimiter(new LoginAttemptRepository($this->db), $config);
         $ordersController = new OrderController(
-            new CheckoutValidator(50, 100, 200), $service, $limiter,
+            new CheckoutValidator(50, 100), $service, $limiter,
             function (): string { return $this->body; },
         );
         $confirmation = new OrderConfirmationController($service, $limiter);
@@ -110,7 +109,7 @@ final class OrderApiTest extends TestCase
         $this->db->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $this->productId]);
     }
 
-    public function testPublicCheckoutReplayAndConfirmationContracts(): void
+    public function testPublicCheckoutAndConfirmationContracts(): void
     {
         $this->body = json_encode([
             'customer_name' => 'API Contract Customer', 'phone_number' => '+2349035732952', 'customer_email' => null,
@@ -124,8 +123,6 @@ final class OrderApiTest extends TestCase
         $created = $this->application->handle($server);
         self::assertSame(201, $created->status);
         self::assertTrue($created->body['success']);
-        $meta = $this->object($created->body['meta'] ?? null);
-        self::assertSame(false, $meta['idempotent_replay']);
         $data = $this->object($created->body['data'] ?? null);
         self::assertSame(25000, $data['total_kobo']);
         self::assertArrayNotHasKey('id', $data);
@@ -136,13 +133,10 @@ final class OrderApiTest extends TestCase
         self::assertArrayNotHasKey('error', $notification);
         self::assertArrayNotHasKey('job_id', $notification);
 
-        $replayed = $this->application->handle($server);
-        self::assertSame(200, $replayed->status);
-        $replayMeta = $this->object($replayed->body['meta'] ?? null);
-        self::assertSame(true, $replayMeta['idempotent_replay']);
-        $replayData = $this->object($replayed->body['data'] ?? null);
-        self::assertSame($data['reference'], $replayData['reference']);
-        self::assertSame($data['confirmation_token'], $replayData['confirmation_token']);
+        $second = $this->application->handle($server);
+        self::assertSame(201, $second->status);
+        $secondData = $this->object($second->body['data'] ?? null);
+        self::assertNotSame($data['reference'], $secondData['reference']);
 
         $reference = $data['reference'] ?? null;
         $token = $data['confirmation_token'] ?? null;
@@ -160,7 +154,7 @@ final class OrderApiTest extends TestCase
         self::assertArrayHasKey('whatsapp_url', $confirmationData);
     }
 
-    public function testCheckoutRequiresJsonAndIdempotencyWithoutAdministratorAuthentication(): void
+    public function testCheckoutRequiresJsonButNotIdempotencyWithoutAdministratorAuthentication(): void
     {
         $this->body = '{}';
         $media = $this->application->handle(['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/api/v1/orders', 'REMOTE_ADDR' => '192.0.2.124']);
@@ -171,12 +165,10 @@ final class OrderApiTest extends TestCase
             'fulfilment_method' => 'pickup', 'delivery_address' => null, 'state' => null,
             'payment_method' => 'cash_on_delivery', 'items' => [['product_id' => $this->productPublicId, 'quantity' => 1]],
         ], JSON_THROW_ON_ERROR);
-        $missingKey = $this->application->handle([
+        $created = $this->application->handle([
             'REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/api/v1/orders', 'CONTENT_TYPE' => 'application/json', 'REMOTE_ADDR' => '192.0.2.124',
         ]);
-        self::assertSame(400, $missingKey->status);
-        $error = $this->object($missingKey->body['error'] ?? null);
-        self::assertSame('IDEMPOTENCY_KEY_REQUIRED', $error['code']);
+        self::assertSame(201, $created->status);
     }
 
     public function testCheckoutRejectsUnavailableProducts(): void

@@ -37,7 +37,7 @@ final readonly class PaymentRateLimiter
 
     private function record(string $scope, string $identifier, int $maximum): void
     {
-        $hash = hash_hmac('sha256', 'pay-rate-v1|' . $scope . '|' . $identifier, $this->config->requiredString('checkout.security_secret'));
+        $hash = hash('sha256', 'pay-rate-v1|' . $scope . '|' . $identifier);
         $attempt = $this->attempts->find($hash);
         $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
 

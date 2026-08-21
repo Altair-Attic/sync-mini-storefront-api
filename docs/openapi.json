@@ -14,7 +14,7 @@
     "tags": [
         {
             "name": "Authentication",
-            "description": "Administrator authentication, JWT Bearer access tokens, and rotating refresh cookies"
+            "description": "Administrator authentication with JWT Bearer access tokens"
         },
         {
             "name": "Store",
@@ -257,12 +257,7 @@
                 ],
                 "summary": "Create guest order (Checkout)",
                 "operationId": "createGuestOrder",
-                "description": "Creates a transactional guest order.\n\n**Important Rules**:\n1. Client-submitted prices and totals are not accepted or trusted. Backend computes totals strictly from persisted database products and business delivery fee configuration.\n2. If any item is inactive (`is_active = false`) or unavailable (`is_available = false`), checkout is rejected with `422 PRODUCT_UNAVAILABLE`.\n3. Requires an `Idempotency-Key` header (16 to 200 ASCII characters). Replays with identical key return the created order with `meta.idempotent_replay = true`.\n4. Returns an order reference and a secret confirmation token.\n",
-                "parameters": [
-                    {
-                        "$ref": "#/components/parameters/IdempotencyKey"
-                    }
-                ],
+                "description": "Creates a transactional guest order.\n\n**Important Rules**:\n1. Client-submitted prices and totals are not accepted or trusted. Backend computes totals strictly from persisted database products and business delivery fee configuration.\n2. If any item is inactive (`is_active = false`) or unavailable (`is_available = false`), checkout is rejected with `422 PRODUCT_UNAVAILABLE`.\n3. The frontend disables its submit control while the request is in progress. A retry can create another cash-on-delivery order.\n4. Returns an order reference and a cryptographically random confirmation token.\n",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -276,16 +271,6 @@
                 "responses": {
                     "201": {
                         "description": "Order created successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/OrderCreatedResponse"
-                                }
-                            }
-                        }
-                    },
-                    "200": {
-                        "description": "Idempotent replay of previously created order",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -600,7 +585,7 @@
                 ],
                 "summary": "Administrator login",
                 "operationId": "adminLogin",
-                "description": "Authenticates an administrator with email and password.\nOn success:\n- Returns a short-lived Bearer JWT access token (15-minute lifetime) in response body.\n- Sets a rotating, Secure, HttpOnly, SameSite refresh token cookie (`project_sync_refresh`).\n- Enforces strict same-origin checking and rate limiting.\n",
+                "description": "Authenticates an administrator with email and password.\nOn success:\n- Returns an eight-hour Bearer JWT access token in the response body.\n- Uses normal CORS configuration and login rate limiting.\n",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -613,7 +598,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Login successful; Bearer access token returned and refresh cookie set",
+                        "description": "Login successful; Bearer access token returned",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -633,39 +618,6 @@
                     },
                     "429": {
                         "$ref": "#/components/responses/RateLimited"
-                    },
-                    "500": {
-                        "$ref": "#/components/responses/InternalError"
-                    }
-                }
-            }
-        },
-        "/admin/refresh": {
-            "post": {
-                "tags": [
-                    "Authentication"
-                ],
-                "summary": "Refresh administrator access token",
-                "operationId": "adminRefresh",
-                "description": "Rotates the refresh token cookie and returns a new Bearer JWT access token.\nRequires the `project_sync_refresh` HttpOnly cookie.\nIf a previously rotated token is reused, the entire token family is revoked immediately.\n",
-                "security": [
-                    {
-                        "refreshCookie": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Access token refreshed and refresh cookie rotated",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AuthSuccessResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/Unauthenticated"
                     },
                     "500": {
                         "$ref": "#/components/responses/InternalError"
@@ -711,20 +663,17 @@
                 "tags": [
                     "Authentication"
                 ],
-                "summary": "Administrator logout",
+                "summary": "Acknowledge administrator logout",
                 "operationId": "adminLogout",
-                "description": "Revokes the refresh token family, denylists the supplied JWT access token by `jti` until expiry, and expires the cookie.\n",
+                "description": "Validates the supplied Bearer token and records a logout event. The frontend must then remove the token from memory; stateless JWTs are not server-revoked and remain valid until expiry.",
                 "security": [
                     {
                         "bearerAuth": []
-                    },
-                    {
-                        "refreshCookie": []
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Logout completed successfully",
+                        "description": "Logout acknowledged",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -732,6 +681,9 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
                     },
                     "500": {
                         "$ref": "#/components/responses/InternalError"
@@ -1860,12 +1812,6 @@
                 "scheme": "bearer",
                 "bearerFormat": "JWT",
                 "description": "Short-lived administrator JWT access token sent in Authorization: Bearer <token> header."
-            },
-            "refreshCookie": {
-                "type": "apiKey",
-                "in": "cookie",
-                "name": "project_sync_refresh",
-                "description": "Rotating HttpOnly cookie used exclusively for /admin/refresh and /admin/logout."
             }
         },
         "parameters": {
@@ -1873,7 +1819,7 @@
                 "name": "Idempotency-Key",
                 "in": "header",
                 "required": true,
-                "description": "Unique client-generated idempotency key (16 to 200 ASCII characters). Ensures retry safety.",
+                "description": "Unique client-generated idempotency key (16 to 200 ASCII characters). Required only for Paystack payment initialization.",
                 "schema": {
                     "type": "string",
                     "minLength": 16,

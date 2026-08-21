@@ -71,25 +71,22 @@ final class NotificationServiceTest extends TestCase
         $checkout = $this->checkout($sender, true);
         $request = $this->request();
 
-        $created = $checkout->create($request, 'notification-idempotency-001');
-        $replay = $checkout->create($request, 'notification-idempotency-001');
-
-        self::assertFalse($created->replay);
-        self::assertTrue($replay->replay);
+        $created = $checkout->create($request);
+        $second = $checkout->create($request);
         $notification = $this->notification($created->order);
         self::assertSame('sent', $notification['merchant_email']);
         self::assertSame('sent', $notification['customer_email']);
-        self::assertCount(2, $sender->messages);
+        self::assertCount(4, $sender->messages);
         self::assertSame('support@example.com', $sender->messages[0]->recipient);
         self::assertStringContainsString('Immutable Email Product', $sender->messages[0]->body);
         self::assertStringNotContainsString('+2349035732952', $sender->messages[1]->body);
-        self::assertCount(2, $sender->messages, 'Replay must not resend.');
-        self::assertSame(2, $this->jobCount());
-        self::assertSame(2, $this->sentJobCount());
+        self::assertCount(4, $sender->messages);
+        self::assertSame(4, $this->jobCount());
+        self::assertSame(4, $this->sentJobCount());
         $orderId = $this->firstOrderId();
         self::assertFalse((new NotificationJobRepository($this->db))->create(UuidGenerator::v4(), $orderId, 'merchant', str_repeat('a', 64), 5));
         self::assertStringStartsWith('https://wa.me/2348035732952?text=', $this->whatsappUrl($created->order));
-        self::assertSame($created->order['whatsapp_url'], $replay->order['whatsapp_url']);
+        self::assertNotSame($created->order['whatsapp_url'], $second->order['whatsapp_url']);
     }
 
     public function testEmailFailureQueuesWithoutLosingCommittedOrder(): void
@@ -97,7 +94,7 @@ final class NotificationServiceTest extends TestCase
         $sender = new FakeEmailSender(true);
         $checkout = $this->checkout($sender, true);
 
-        $created = $checkout->create($this->request(), 'notification-idempotency-002');
+        $created = $checkout->create($this->request());
 
         $notification = $this->notification($created->order);
         self::assertSame('queued', $notification['merchant_email']);
@@ -110,9 +107,8 @@ final class NotificationServiceTest extends TestCase
         self::assertSame('pending', $rows[0]['status']);
         self::assertSame(1, (int) $rows[0]['attempts']);
         self::assertSame('FAKE_DELIVERY_FAILED', $rows[0]['last_error_code']);
-        $replay = $checkout->create($this->request(), 'notification-idempotency-002');
-        self::assertTrue($replay->replay);
-        self::assertSame(2, $sender->attempts, 'Replay must not retry queued jobs.');
+        $checkout->create($this->request());
+        self::assertSame(4, $sender->attempts);
     }
 
     public function testDisabledOrUnavailableRecipientsSkipJobs(): void
@@ -121,7 +117,7 @@ final class NotificationServiceTest extends TestCase
         $request = $this->request();
         $request['customer_email'] = null;
 
-        $created = $this->checkout(new FakeEmailSender(), true)->create($request, 'notification-idempotency-003');
+        $created = $this->checkout(new FakeEmailSender(), true)->create($request);
 
         $notification = $this->notification($created->order);
         self::assertSame('skipped', $notification['merchant_email']);
@@ -133,7 +129,7 @@ final class NotificationServiceTest extends TestCase
     {
         $this->db->exec('UPDATE business_profiles SET merchant_email_notifications_enabled = FALSE, customer_email_notifications_enabled = FALSE');
 
-        $created = $this->checkout(new FakeEmailSender(), true)->create($this->request(), 'notification-idempotency-disabled');
+        $created = $this->checkout(new FakeEmailSender(), true)->create($this->request());
 
         $notification = $this->notification($created->order);
         self::assertSame('skipped', $notification['merchant_email']);
@@ -144,7 +140,7 @@ final class NotificationServiceTest extends TestCase
     public function testClaimsAreAtomicAndSmtpRunsWithoutDatabaseTransaction(): void
     {
         $checkout = $this->checkout(new FakeEmailSender(), false);
-        $created = $checkout->create($this->request(), 'notification-idempotency-004');
+        $created = $checkout->create($this->request());
         self::assertSame('queued', $this->notification($created->order)['merchant_email']);
         $id = $this->firstJobId();
         $jobs = new NotificationJobRepository($this->db);
@@ -173,7 +169,7 @@ final class NotificationServiceTest extends TestCase
     public function testStaleRecoveryBatchLimitBackoffAndExhaustion(): void
     {
         $checkout = $this->checkout(new FakeEmailSender(), false);
-        $checkout->create($this->request(), 'notification-idempotency-005');
+        $checkout->create($this->request());
         $this->db->exec("UPDATE notification_jobs SET status = 'processing', attempts = 1, processing_started_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 HOUR)");
         $processor = $this->processor(new FakeEmailSender(true), 2);
 
@@ -198,13 +194,13 @@ final class NotificationServiceTest extends TestCase
         $processor = $this->processor($sender);
         $notifications = new NotificationService(
             new BusinessProfileRepository($this->db), $jobs, $processor, new WhatsAppHandoffService(),
-            new NullLogger(), str_repeat('notification-security-', 3), 5, $immediate,
+            new NullLogger(), 5, $immediate,
         );
 
         return new CheckoutService(
             $this->db, new BusinessProfileRepository($this->db), new ProductRepository($this->db),
             new OrderRepository($this->db), new OrderItemRepository($this->db), new OrderReferenceGenerator(),
-            new OrderConfirmationTokenService(str_repeat('order-security-', 3)), 4_294_967_295, $notifications,
+            new OrderConfirmationTokenService(), 4_294_967_295, $notifications,
         );
     }
 

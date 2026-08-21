@@ -26,7 +26,6 @@ final readonly class PaymentService
         private PaymentFinalizationService $finalizer,
         private OrderConfirmationTokenService $tokens,
         private PaymentReferenceGenerator $references,
-        private string $securitySecret,
         private ?LoggerInterface $logger = null,
     ) {
     }
@@ -74,7 +73,7 @@ final readonly class PaymentService
             throw new PaymentException('UNSUPPORTED_CURRENCY', 'Only NGN currency is supported.', 422);
         }
 
-        $idempotencyHash = hash_hmac('sha256', 'pay-init-v1|' . $idempotencyKey, $this->securitySecret);
+        $idempotencyHash = hash('sha256', 'pay-init-v1|' . $idempotencyKey);
 
         // Check for order-scoped idempotent replay
         $existing = $this->attempts->findByOrderAndIdempotencyHash($orderId, $idempotencyHash);

@@ -56,7 +56,7 @@ final class CheckoutServiceTest extends TestCase
             $orders,
             $items,
             new OrderReferenceGenerator(),
-            new OrderConfirmationTokenService(str_repeat('integration-secret-', 3)),
+            new OrderConfirmationTokenService(),
             4_294_967_295,
         );
     }
@@ -68,16 +68,14 @@ final class CheckoutServiceTest extends TestCase
         $this->db->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $this->productId]);
     }
 
-    public function testDeliveryPricingSnapshotsTransactionIdempotencyAndConfirmation(): void
+    public function testDeliveryPricingSnapshotsAndConfirmation(): void
     {
         $request = $this->request('delivery');
-        $initial = $this->checkout->create($request, 'checkout-test-key-000001');
-        $replay = $this->checkout->create($request, 'checkout-test-key-000001');
+        $initial = $this->checkout->create($request);
+        $second = $this->checkout->create($request);
 
-        self::assertFalse($initial->replay);
-        self::assertTrue($replay->replay);
-        self::assertSame($initial->order['reference'], $replay->order['reference']);
-        self::assertSame($initial->confirmationToken, $replay->confirmationToken);
+        self::assertNotSame($initial->order['reference'], $second->order['reference']);
+        self::assertNotSame($initial->confirmationToken, $second->confirmationToken);
         self::assertSame(500000, $initial->order['subtotal_kobo']);
         self::assertSame(150000, $initial->order['delivery_fee_kobo']);
         self::assertSame(650000, $initial->order['total_kobo']);
@@ -85,8 +83,8 @@ final class CheckoutServiceTest extends TestCase
         $initialItem = $this->firstItem($initial->order);
         self::assertSame('Checkout Snapshot Product', $initialItem['product_title']);
         self::assertSame(250000, $initialItem['unit_price_kobo']);
-        self::assertSame(1, $this->countRows('orders'));
-        self::assertSame(1, $this->countRows('order_items'));
+        self::assertSame(2, $this->countRows('orders'));
+        self::assertSame(2, $this->countRows('order_items'));
 
         $reference = $this->reference($initial->order);
         $confirmation = $this->checkout->confirmation($reference, $initial->confirmationToken);
@@ -98,7 +96,7 @@ final class CheckoutServiceTest extends TestCase
             self::fail('Could not inspect stored idempotency hash.');
         }
         $rawStored = $statement->fetchColumn();
-        self::assertNotSame('checkout-test-key-000001', $rawStored);
+        self::assertNull($rawStored);
 
         $this->db->prepare('UPDATE products SET title = \'Changed Product\', price_kobo = 1, is_active = FALSE WHERE id = :id')->execute(['id' => $this->productId]);
         $historic = $this->checkout->confirmation($reference, $initial->confirmationToken);
@@ -109,14 +107,14 @@ final class CheckoutServiceTest extends TestCase
 
     public function testPickupHasZeroFeeAndUnavailableProductsAreRejected(): void
     {
-        $pickup = $this->checkout->create($this->request('pickup'), 'checkout-test-key-000002');
+        $pickup = $this->checkout->create($this->request('pickup'));
         self::assertSame(0, $pickup->order['delivery_fee_kobo']);
         self::assertSame(500000, $pickup->order['total_kobo']);
 
         // Inactive product rejected
         $this->db->prepare('UPDATE products SET is_active = FALSE WHERE id = :id')->execute(['id' => $this->productId]);
         try {
-            $this->checkout->create($this->request('pickup'), 'checkout-test-key-000003');
+            $this->checkout->create($this->request('pickup'));
             self::fail('Expected inactive product rejection.');
         } catch (CheckoutException $exception) {
             self::assertSame('PRODUCT_UNAVAILABLE', $exception->errorCode);
@@ -126,7 +124,7 @@ final class CheckoutServiceTest extends TestCase
         // Active but unavailable product rejected
         $this->db->prepare('UPDATE products SET is_active = TRUE, is_available = FALSE WHERE id = :id')->execute(['id' => $this->productId]);
         try {
-            $this->checkout->create($this->request('pickup'), 'checkout-test-key-000003b');
+            $this->checkout->create($this->request('pickup'));
             self::fail('Expected unavailable product rejection.');
         } catch (CheckoutException $exception) {
             self::assertSame('PRODUCT_UNAVAILABLE', $exception->errorCode);
@@ -135,22 +133,17 @@ final class CheckoutServiceTest extends TestCase
 
         // Re-enabling availability immediately allows ordering again
         $this->db->prepare('UPDATE products SET is_available = TRUE WHERE id = :id')->execute(['id' => $this->productId]);
-        $reordered = $this->checkout->create($this->request('pickup'), 'checkout-test-key-000003c');
+        $reordered = $this->checkout->create($this->request('pickup'));
         self::assertSame(500000, $reordered->order['total_kobo']);
     }
 
-    public function testChangedRequestConflictsAndWrongConfirmationTokenLooksMissing(): void
+    public function testRepeatedRequestsCreateIndependentOrdersAndWrongConfirmationTokenLooksMissing(): void
     {
-        $created = $this->checkout->create($this->request('delivery'), 'checkout-test-key-000004');
+        $created = $this->checkout->create($this->request('delivery'));
         $changed = $this->request('delivery');
         $changed['items'] = [['product_id' => $this->productPublicId, 'quantity' => 1]];
-        try {
-            $this->checkout->create($changed, 'checkout-test-key-000004');
-            self::fail('Expected idempotency conflict.');
-        } catch (CheckoutException $exception) {
-            self::assertSame('IDEMPOTENCY_KEY_CONFLICT', $exception->errorCode);
-            self::assertSame(409, $exception->status);
-        }
+        $second = $this->checkout->create($changed);
+        self::assertNotSame($created->order['reference'], $second->order['reference']);
         try {
             $this->checkout->confirmation($this->reference($created->order), 'wrong-token');
             self::fail('Expected confirmation failure.');
@@ -164,7 +157,7 @@ final class CheckoutServiceTest extends TestCase
     {
         $this->db->exec('UPDATE business_profiles SET delivery_enabled = FALSE');
         try {
-            $this->checkout->create($this->request('delivery'), 'checkout-test-key-000005');
+            $this->checkout->create($this->request('delivery'));
             self::fail('Expected disabled delivery rejection.');
         } catch (CheckoutException $exception) {
             self::assertSame('FULFILMENT_METHOD_UNAVAILABLE', $exception->errorCode);
@@ -177,11 +170,11 @@ final class CheckoutServiceTest extends TestCase
             new OrderRepository($this->db),
             new OrderItemRepository($this->db),
             new OrderReferenceGenerator(),
-            new OrderConfirmationTokenService(str_repeat('integration-secret-', 3)),
+            new OrderConfirmationTokenService(),
             100,
         );
         try {
-            $limited->create($this->request('pickup'), 'checkout-test-key-000006');
+            $limited->create($this->request('pickup'));
             self::fail('Expected total limit rejection.');
         } catch (CheckoutException $exception) {
             self::assertSame('ORDER_TOTAL_LIMIT_EXCEEDED', $exception->errorCode);
@@ -197,7 +190,7 @@ final class CheckoutServiceTest extends TestCase
             . "BEGIN IF NEW.product_id = '" . $this->productId . "' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Injected item failure'; END IF; END"
         );
         try {
-            $this->checkout->create($this->request('pickup'), 'checkout-test-key-rollback');
+            $this->checkout->create($this->request('pickup'));
             self::fail('Expected injected order item failure.');
         } catch (\PDOException) {
             self::assertSame(0, $this->countRows('orders'));

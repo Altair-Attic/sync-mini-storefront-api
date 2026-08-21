@@ -10,7 +10,6 @@ final readonly class CheckoutResult
     public function __construct(
         public array $order,
         public string $confirmationToken,
-        public bool $replay,
     ) {
     }
 }

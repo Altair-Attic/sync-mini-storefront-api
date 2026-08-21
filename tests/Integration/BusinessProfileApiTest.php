@@ -173,8 +173,8 @@ final class BusinessProfileApiTest extends TestCase
             'app.debug' => false,
             'cors.allowed_origins' => [],
         ]);
-        $jwt = new JwtService('business-profile-jwt-test-secret-32-bytes', 'https://test.example', 'https://test.example/admin', 900, 30, 'HS256');
-        $authentication = new AuthenticationMiddleware($jwt, new MerchantUserRepository($pdo), new RevokedAccessTokenRepository($pdo));
+        $jwt = new JwtService('business-profile-jwt-test-secret-32-bytes', 28800, 'HS256');
+        $authentication = new AuthenticationMiddleware($jwt, new MerchantUserRepository($pdo));
         $encodedBody = $body === null ? '' : json_encode($body, JSON_THROW_ON_ERROR);
         $controller = new BusinessProfileController(
             new BusinessProfileService(new BusinessProfileRepository($pdo), new BusinessProfileValidator()),

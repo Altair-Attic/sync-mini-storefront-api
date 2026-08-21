@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace ProjectSync\Middleware;
 
 use ProjectSync\Infrastructure\Auth\JwtService;
-use ProjectSync\Infrastructure\Auth\VerifiedAccessToken;
 use ProjectSync\Infrastructure\HttpResponse;
 use ProjectSync\Infrastructure\JsonResponse;
 use ProjectSync\Repositories\MerchantUserRepository;
-use ProjectSync\Repositories\RevokedAccessTokenRepository;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
@@ -18,7 +16,6 @@ final readonly class AuthenticationMiddleware
     public function __construct(
         private JwtService $jwt,
         private MerchantUserRepository $users,
-        private RevokedAccessTokenRepository $revokedTokens,
         private ?LoggerInterface $logger = null,
     )
     {
@@ -35,38 +32,16 @@ final readonly class AuthenticationMiddleware
             return $this->unauthenticated($requestId, 'missing_or_malformed_header');
         }
         try {
-            $token = $this->jwt->inspect($matches[1]);
+            $administratorId = $this->jwt->verify($matches[1]);
         } catch (RuntimeException) {
             return $this->unauthenticated($requestId, 'invalid_jwt');
         }
-        if ($this->revokedTokens->isRevoked($token->jwtId)) {
-            return $this->unauthenticated($requestId, 'revoked_token');
-        }
-        $administrator = $this->users->findActive($token->administratorId);
+        $administrator = $this->users->findActive($administratorId);
         if ($administrator === null) {
             return $this->unauthenticated($requestId, 'inactive_or_missing_admin');
         }
 
         return $administrator;
-    }
-
-    /** @param array<string, mixed> $server */
-    public function validAccessToken(array $server): ?VerifiedAccessToken
-    {
-        $header = $this->authorizationHeader($server);
-        if (!is_string($header) || preg_match('/^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/D', $header, $matches) !== 1) {
-            return null;
-        }
-        try {
-            $token = $this->jwt->inspect($matches[1]);
-        } catch (RuntimeException) {
-            return null;
-        }
-        if ($this->revokedTokens->isRevoked($token->jwtId) || $this->users->findActive($token->administratorId) === null) {
-            return null;
-        }
-
-        return $token;
     }
 
     /**

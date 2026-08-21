@@ -17,16 +17,9 @@ paths:
                 email: {type: string, format: email}
                 password: {type: string}
       responses:
-        '200': {description: Access token returned and refresh cookie set}
+        '200': {description: Bearer access token returned}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '429': {description: Login rate limit exceeded}
-  /api/v1/admin/refresh:
-    post:
-      summary: Rotate the refresh token and issue an access token
-      security: [{refreshCookie: []}]
-      responses:
-        '200': {description: Access token returned and refresh cookie rotated}
-        '401': {$ref: '#/components/responses/Unauthenticated'}
   /api/v1/admin/me:
     get:
       summary: Return the current active administrator
@@ -36,14 +29,15 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
   /api/v1/admin/logout:
     post:
-      summary: Revoke the current refresh-token family and the supplied Bearer access token, then expire its cookie
-      security: [{refreshCookie: []}, {bearerAuth: []}]
+      summary: Acknowledge an authenticated client-side logout
+      description: Records a safe logout event. The frontend discards its in-memory token; the issued stateless JWT remains valid until expiry.
+      security: [{bearerAuth: []}]
       responses:
-        '200': {description: Logout completed, including when already logged out}
+        '200': {description: Logout acknowledged}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
 components:
   securitySchemes:
     bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
-    refreshCookie: {type: apiKey, in: cookie, name: project_sync_refresh}
   responses:
     Unauthenticated:
       description: Authentication failed without verification details

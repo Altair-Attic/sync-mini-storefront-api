@@ -18,12 +18,11 @@ final readonly class NotificationService
         private NotificationProcessor $processor,
         private WhatsAppHandoffService $whatsapp,
         private LoggerInterface $logger,
-        private string $securitySecret,
         private int $maxAttempts,
         private bool $immediateEmailEnabled,
     ) {
-        if (strlen($securitySecret) < 32 || $maxAttempts < 1) {
-            throw new \InvalidArgumentException('Invalid notification security or retry configuration.');
+        if ($maxAttempts < 1) {
+            throw new \InvalidArgumentException('Invalid notification retry configuration.');
         }
     }
 
@@ -93,7 +92,7 @@ final readonly class NotificationService
 
     private function recipientHash(string $recipient): string
     {
-        return hash_hmac('sha256', 'notification-recipient-v1|' . strtolower($recipient), $this->securitySecret);
+        return hash('sha256', 'notification-recipient-v1|' . strtolower($recipient));
     }
 
     /**

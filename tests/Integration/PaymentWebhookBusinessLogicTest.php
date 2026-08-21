@@ -113,7 +113,7 @@ final class PaymentWebhookBusinessLogicTest extends TestCase
         $sender = new FakeEmailSender();
         $builder = new OrderEmailBuilder();
         $processor = new NotificationProcessor($this->jobRepo, $orders, $items, $profiles, $sender, $builder, $logger, 300, 900);
-        $notifications = new NotificationService($profiles, $this->jobRepo, $processor, new WhatsAppHandoffService(), $logger, 'sec-key-32-chars-long-test-12345', 5, false);
+        $notifications = new NotificationService($profiles, $this->jobRepo, $processor, new WhatsAppHandoffService(), $logger, 5, false);
 
         $attempts = new PaymentAttemptRepository($this->db);
         $events = new PaymentEventRepository($this->db);
@@ -126,9 +126,8 @@ final class PaymentWebhookBusinessLogicTest extends TestCase
             events: $events,
             paystack: $paystack,
             finalizer: $finalizer,
-            tokens: new OrderConfirmationTokenService('sec-key-32-chars-long-test-12345'),
+            tokens: new OrderConfirmationTokenService(),
             references: new PaymentReferenceGenerator(),
-            securitySecret: 'sec-key-32-chars-long-test-12345',
             logger: $logger,
         );
 

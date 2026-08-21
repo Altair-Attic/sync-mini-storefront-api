@@ -178,10 +178,7 @@ final class CatalogueApiTest extends TestCase
         $appConfig = require $this->root . '/config/app.php';
         $jwt = new \ProjectSync\Infrastructure\Auth\JwtService(
             $appConfig['authentication']['jwt_secret'],
-            $appConfig['authentication']['jwt_issuer'],
-            $appConfig['authentication']['jwt_audience'],
-            900,
-            30,
+            28800,
             'HS256'
         );
         $token = $jwt->issue($adminId)['access_token'];
@@ -295,16 +292,12 @@ final class CatalogueApiTest extends TestCase
         $appConfig = require $this->root . '/config/app.php';
         $jwt = new \ProjectSync\Infrastructure\Auth\JwtService(
             $appConfig['authentication']['jwt_secret'],
-            $appConfig['authentication']['jwt_issuer'],
-            $appConfig['authentication']['jwt_audience'],
-            900,
-            30,
+            28800,
             'HS256'
         );
         $authMiddleware = new \ProjectSync\Middleware\AuthenticationMiddleware(
             $jwt,
             new \ProjectSync\Repositories\MerchantUserRepository($this->db),
-            new \ProjectSync\Repositories\RevokedAccessTokenRepository($this->db),
         );
         $controller = new \ProjectSync\Controllers\ProductController(
             $this->products,

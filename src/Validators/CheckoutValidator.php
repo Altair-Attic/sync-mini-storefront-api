@@ -18,7 +18,6 @@ final readonly class CheckoutValidator
     public function __construct(
         private int $maxDistinctItems,
         private int $maxQuantity,
-        private int $maxIdempotencyKeyLength,
     ) {
     }
 
@@ -99,18 +98,6 @@ final readonly class CheckoutValidator
             'payment_method' => 'cash_on_delivery',
             'items' => $items,
         ];
-    }
-
-    public function validateIdempotencyKey(mixed $value): string
-    {
-        if (!is_string($value) || trim($value) === '') {
-            throw new CheckoutException('IDEMPOTENCY_KEY_REQUIRED', 'A non-empty Idempotency-Key header is required.', 400);
-        }
-        if ($value !== trim($value) || strlen($value) < 16 || strlen($value) > $this->maxIdempotencyKeyLength || preg_match('/^[\x21-\x7E]+$/', $value) !== 1) {
-            throw new CheckoutException('IDEMPOTENCY_KEY_INVALID', 'The Idempotency-Key header is invalid.', 400);
-        }
-
-        return $value;
     }
 
     /**

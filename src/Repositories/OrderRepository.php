@@ -14,12 +14,6 @@ final readonly class OrderRepository
     }
 
     /** @return array<string, mixed>|null */
-    public function findByIdempotencyHash(string $hash): ?array
-    {
-        return $this->find('idempotency_key_hash = :value', $hash);
-    }
-
-    /** @return array<string, mixed>|null */
     public function findByReference(string $reference): ?array
     {
         return $this->find('reference = :value', $reference);
@@ -242,7 +236,7 @@ final readonly class OrderRepository
     private function order(array $row): array
     {
         $strings = [
-            'id', 'reference', 'confirmation_token_hash', 'idempotency_key_hash', 'request_fingerprint',
+            'id', 'reference', 'confirmation_token_hash',
             'customer_name', 'phone_number', 'fulfilment_method', 'currency', 'payment_method',
             'payment_status', 'fulfilment_status', 'created_at', 'updated_at',
         ];
@@ -251,7 +245,7 @@ final readonly class OrderRepository
                 throw new RuntimeException('Invalid order record.');
             }
         }
-        foreach (['customer_email', 'delivery_address', 'state'] as $field) {
+        foreach (['idempotency_key_hash', 'request_fingerprint', 'customer_email', 'delivery_address', 'state'] as $field) {
             if (($row[$field] ?? null) !== null && !is_string($row[$field])) {
                 throw new RuntimeException('Invalid order record.');
             }

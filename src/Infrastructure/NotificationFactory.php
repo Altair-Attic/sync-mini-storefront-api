@@ -30,7 +30,6 @@ final class NotificationFactory
             $processor,
             new WhatsAppHandoffService(),
             $logger,
-            $config->requiredString('notifications.security_secret'),
             (int) $config->requiredString('notifications.max_attempts'),
             $config->bool('mail.enabled'),
         );

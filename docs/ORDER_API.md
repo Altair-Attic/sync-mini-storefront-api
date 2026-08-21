@@ -17,13 +17,11 @@ At least one fulfilment method must remain enabled. Pickup always costs `0` kobo
 
 ## Create an order
 
-`POST /api/v1/orders` is public, requires `Content-Type: application/json`, and must include an `Idempotency-Key` header containing 16–200 printable ASCII characters. Generate a new cryptographically random value for each intended order and retain it until checkout succeeds.
+`POST /api/v1/orders` is public and requires `Content-Type: application/json`. The frontend should disable its submit control while the request is in progress; normal checkout does not require an `Idempotency-Key` header.
 
 ```http
 POST /api/v1/orders HTTP/1.1
 Content-Type: application/json
-Idempotency-Key: 0e8fd2798c754dfca0f5541738eef65d
-
 {
   "customer_name": "John Doe",
   "phone_number": "+2349035732952",
@@ -40,21 +38,15 @@ Pickup requires `delivery_address` and `state` to be `null`. Delivery requires b
 
 Product activity and current prices are loaded in one bounded MySQL query. All money is integer Nigerian kobo. The only payment method is `cash_on_delivery`; new orders use payment status `unpaid`, fulfilment status `new`, and currency `NGN` from the business profile.
 
-A new order returns HTTP `201` after its database transaction commits, independently of email delivery. The response contains its public reference, confirmation token, confirmation-safe customer/order fields, immutable item snapshots, `whatsapp_url`, safe `notification` state, and `meta.idempotent_replay: false`. Internal IDs are never returned.
+A new order returns HTTP `201` after its database transaction commits, independently of email delivery. The response contains its public reference, a random confirmation token, confirmation-safe customer/order fields, immutable item snapshots, `whatsapp_url`, and safe `notification` state. Internal IDs are never returned.
 
 `notification.merchant_email` and `notification.customer_email` are `sent`, `queued`, or `skipped`. Recipient addresses, job IDs, provider errors, and credentials are never exposed. `whatsapp_url` is nullable and no network call is made.
 
-## Idempotency and retry behavior
+## Submission and confirmation behavior
 
-The server stores an HMAC-protected hash of the idempotency key, never the raw key. It fingerprints the normalized request, checks before and inside the transaction, and relies on a unique database constraint to resolve concurrent races.
+Each accepted checkout request creates its own order transaction. The frontend disables repeated submission during the request; an unusual retry can create another cash-on-delivery order. A failure before commit leaves no order or items.
 
-- Same key and same normalized request: HTTP `200`, the original result, and `meta.idempotent_replay: true`.
-- Same key and different request: HTTP `409` with `IDEMPOTENCY_KEY_CONFLICT`.
-- Failure before commit: neither the order nor any item remains.
-- Retry after commit: the committed order and the same confirmation credential are returned.
-- Replay never creates jobs, resends sent email, or immediately retries queued jobs; it returns current safe notification state.
-
-The confirmation credential is a domain-separated HMAC derivation from the protected idempotency hash and a per-deployment `ORDER_SECURITY_SECRET`. Only its SHA-256 lookup hash is stored. This makes safe replay possible without storing either raw credential.
+The confirmation credential is generated with cryptographically secure random bytes for each order. Only its SHA-256 hash is stored; the raw token is returned once in the successful checkout response.
 
 ## Confirmation
 

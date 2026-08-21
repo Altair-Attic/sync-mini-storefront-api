@@ -6,23 +6,9 @@ namespace ProjectSync\Services;
 
 final readonly class OrderConfirmationTokenService
 {
-    public function __construct(private string $secret)
+    public function generate(): string
     {
-        if (strlen($secret) < 32) {
-            throw new \InvalidArgumentException('ORDER_SECURITY_SECRET must contain at least 32 characters.');
-        }
-    }
-
-    public function idempotencyHash(string $key): string
-    {
-        return hash_hmac('sha256', 'idempotency-v1|' . $key, $this->secret);
-    }
-
-    public function token(string $idempotencyHash): string
-    {
-        $bytes = hash_hmac('sha256', 'confirmation-v1|' . $idempotencyHash, $this->secret, true);
-
-        return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+        return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
     }
 
     public function tokenHash(string $token): string

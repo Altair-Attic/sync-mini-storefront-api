@@ -21,7 +21,7 @@ final class MigrationRunnerTest extends TestCase
         $connection->method('exec')->willReturn(0);
         $connection->expects(self::never())->method('beginTransaction');
         $connection->expects(self::never())->method('commit');
-        $connection->expects(self::exactly(19))->method('prepare')->willReturnOnConsecutiveCalls($applied, $batch, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record);
+        $connection->expects(self::exactly(20))->method('prepare')->willReturnOnConsecutiveCalls($applied, $batch, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record, $record);
         $applied->method('execute')->willReturn(true);
         $applied->method('fetchAll')->willReturn([]);
         $batch->method('execute')->willReturn(true);
@@ -48,6 +48,7 @@ final class MigrationRunnerTest extends TestCase
             '202608170015_add_is_available_to_products',
             '202608170016_create_payment_attempts_table',
             '202608170017_create_payment_events_table',
+            '202608210018_retire_checkout_idempotency_columns',
         ], $executed);
 
     }

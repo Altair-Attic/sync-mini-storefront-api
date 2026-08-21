@@ -107,8 +107,8 @@ sequenceDiagram
     participant MySQL as Merchant Database
 
     Customer->>Frontend: Click "Place Order"
-    Frontend->>Frontend: Generate unique Idempotency-Key
-    Frontend->>API: POST /api/v1/orders (Idempotency-Key header)
+    Frontend->>Frontend: Disable checkout submit control
+    Frontend->>API: POST /api/v1/orders
     API->>MySQL: Lock & Validate Products, Recalculate Totals
     API->>MySQL: Insert order & order_items snapshots (Transaction)
     API-->>Frontend: 201 Created (reference, confirmation_token, whatsapp_url)
@@ -120,7 +120,6 @@ sequenceDiagram
 ```http
 POST /api/v1/orders HTTP/1.1
 Host: store.vintageboutique.ng
-Idempotency-Key: checkout-attempt-20260818-abc12345
 Content-Type: application/json
 
 {
@@ -194,25 +193,15 @@ Content-Type: application/json
 }
 ```
 **Response**:
-- `data.access_token`: Short-lived JWT (15-minute lifetime). **Store strictly in React memory** (e.g. React context or Zustand store). **NEVER** save to `localStorage` or `sessionStorage`.
-- `Set-Cookie: project_sync_refresh=...; HttpOnly; Secure; SameSite=Strict`: Rotating refresh token cookie managed automatically by the browser.
+- `data.access_token`: JWT with an eight-hour default lifetime. **Store strictly in React memory** (e.g. React context or Zustand store). **NEVER** save to `localStorage` or `sessionStorage`.
 
-### 7.2 Automatic Token Refresh
-Before the 15-minute access token expires (or upon receiving `401 UNAUTHENTICATED`), call:
-```http
-POST /api/v1/admin/refresh HTTP/1.1
-Host: store.vintageboutique.ng
-Origin: https://store.vintageboutique.ng
-```
-(Include `credentials: 'include'` in `fetch()` or `withCredentials: true` in `axios` so the browser sends the `project_sync_refresh` cookie).
-
-### 7.3 Admin Logout
+### 7.2 Admin Logout
 ```http
 POST /api/v1/admin/logout HTTP/1.1
 Host: store.vintageboutique.ng
 Authorization: Bearer <access_token>
 ```
-Revokes the refresh token family and denylists the access token until its expiration.
+Call this endpoint before removing the token from frontend memory and redirecting to login. It records the logout, but cannot invalidate the stateless JWT; do not retain the token in any client storage.
 
 ---
 
@@ -262,7 +251,7 @@ Content-Type: application/json
 | Error Code | HTTP Status | Description & Recommended UI Action |
 |---|---|---|
 | `VALIDATION_FAILED` | 422 | Form field validation failed. Highlight inputs using `error.fields`. |
-| `UNAUTHENTICATED` | 401 | Missing or expired JWT. Trigger `/admin/refresh` or redirect to `/login`. |
+| `UNAUTHENTICATED` | 401 | Missing or expired JWT. Remove the token and redirect to `/login`. |
 | `PRODUCT_UNAVAILABLE` | 422 | An item in cart is no longer available. Prompt user to remove it. |
 | `PRODUCT_NOT_FOUND` | 404 | Product does not exist or is inactive. Show 404 Not Found page. |
 | `ORDER_NOT_FOUND` | 404 | Order reference does not exist. |

@@ -67,10 +67,7 @@ final class PaymentReconciliationTest extends TestCase
 
         $this->jwt = new JwtService(
             secret: 'test-jwt-secret-key-32-chars-minimum!',
-            issuer: 'https://test.project-sync.local',
-            audience: 'https://test.project-sync.local',
-            ttlSeconds: 900,
-            clockSkewSeconds: 30,
+            ttlSeconds: 28800,
             algorithm: 'HS256',
         );
 
@@ -153,8 +150,7 @@ final class PaymentReconciliationTest extends TestCase
         };
 
         $users = new MerchantUserRepository($this->db);
-        $revokedTokens = new RevokedAccessTokenRepository($this->db);
-        $authMiddleware = new AuthenticationMiddleware($this->jwt, $users, $revokedTokens);
+        $authMiddleware = new AuthenticationMiddleware($this->jwt, $users);
 
         $orders = new OrderRepository($this->db);
         $attempts = new PaymentAttemptRepository($this->db);
@@ -168,9 +164,8 @@ final class PaymentReconciliationTest extends TestCase
             events: $events,
             paystack: $paystack,
             finalizer: $finalizer,
-            tokens: new OrderConfirmationTokenService('sec-key-32-chars-long-test-12345'),
+            tokens: new OrderConfirmationTokenService(),
             references: new PaymentReferenceGenerator(),
-            securitySecret: 'sec-key-32-chars-long-test-12345',
             logger: $logger,
         );
 

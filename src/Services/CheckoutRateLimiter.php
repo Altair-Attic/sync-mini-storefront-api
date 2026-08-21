@@ -59,6 +59,6 @@ final readonly class CheckoutRateLimiter
 
     private function hash(string $scope, string $identifier): string
     {
-        return hash_hmac('sha256', 'public-rate-v1|' . $scope . '|' . $identifier, $this->config->requiredString('checkout.security_secret'));
+        return hash('sha256', 'public-rate-v1|' . $scope . '|' . $identifier);
     }
 }

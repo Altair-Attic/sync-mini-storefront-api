@@ -6,7 +6,6 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use ProjectSync\Exceptions\CheckoutException;
 use ProjectSync\Exceptions\ValidationException;
 use ProjectSync\Validators\CheckoutValidator;
 
@@ -16,7 +15,7 @@ final class CheckoutValidatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->validator = new CheckoutValidator(2, 10, 40);
+        $this->validator = new CheckoutValidator(2, 10);
     }
 
     public function testValidDeliveryIsNormalizedAndItemsAreSorted(): void
@@ -102,23 +101,6 @@ final class CheckoutValidatorTest extends TestCase
 
         $this->expectException(ValidationException::class);
         $this->validator->validate($input);
-    }
-
-    public function testIdempotencyKeyValidationUsesStableCodes(): void
-    {
-        try {
-            $this->validator->validateIdempotencyKey('');
-            self::fail('Expected missing key failure.');
-        } catch (CheckoutException $exception) {
-            self::assertSame('IDEMPOTENCY_KEY_REQUIRED', $exception->errorCode);
-        }
-        try {
-            $this->validator->validateIdempotencyKey(str_repeat('a', 41));
-            self::fail('Expected oversized key failure.');
-        } catch (CheckoutException $exception) {
-            self::assertSame('IDEMPOTENCY_KEY_INVALID', $exception->errorCode);
-        }
-        self::assertSame('0123456789abcdef', $this->validator->validateIdempotencyKey('0123456789abcdef'));
     }
 
     /** @return array<string, mixed> */

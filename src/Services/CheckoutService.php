@@ -6,9 +6,7 @@ namespace ProjectSync\Services;
 
 use DateTimeImmutable;
 use DateTimeZone;
-use JsonException;
 use PDO;
-use PDOException;
 use ProjectSync\Exceptions\BusinessProfileNotFoundException;
 use ProjectSync\Exceptions\CheckoutException;
 use ProjectSync\Infrastructure\UuidGenerator;
@@ -36,15 +34,8 @@ final readonly class CheckoutService
     /**
      * @param array{customer_name: string, phone_number: string, customer_email: string|null, fulfilment_method: string, delivery_address: string|null, state: string|null, payment_method: string, items: list<array{product_id: string, quantity: int}>} $request
      */
-    public function create(array $request, string $idempotencyKey): CheckoutResult
+    public function create(array $request): CheckoutResult
     {
-        $fingerprint = $this->fingerprint($request);
-        $idempotencyHash = $this->tokens->idempotencyHash($idempotencyKey);
-        $existing = $this->orders->findByIdempotencyHash($idempotencyHash);
-        if ($existing !== null) {
-            return $this->replay($existing, $fingerprint);
-        }
-
         $configuration = $this->profiles->checkoutConfiguration();
         if ($configuration === null) {
             throw new BusinessProfileNotFoundException();
@@ -83,13 +74,13 @@ final readonly class CheckoutService
         $deliveryFee = $method === 'delivery' ? $configuration['fixed_delivery_fee_kobo'] : 0;
         $total = $this->add($subtotal, $deliveryFee);
         $orderId = UuidGenerator::v4();
-        $token = $this->tokens->token($idempotencyHash);
+        $token = $this->tokens->generate();
         $order = [
             'id' => $orderId,
             'reference' => $this->references->generate(),
             'confirmation_token_hash' => $this->tokens->tokenHash($token),
-            'idempotency_key_hash' => $idempotencyHash,
-            'request_fingerprint' => $fingerprint,
+            'idempotency_key_hash' => null,
+            'request_fingerprint' => null,
             'customer_name' => $request['customer_name'],
             'phone_number' => $request['phone_number'],
             'customer_email' => $request['customer_email'],
@@ -111,35 +102,20 @@ final readonly class CheckoutService
 
         try {
             $this->db->beginTransaction();
-            $inside = $this->orders->findByIdempotencyHash($idempotencyHash);
-            if ($inside !== null) {
-                $this->db->rollBack();
-
-                return $this->replay($inside, $fingerprint);
-            }
             $this->orders->insert($order);
             $this->orderItems->insertMany($snapshots);
             $this->db->commit();
-        } catch (PDOException $exception) {
-            $this->rollback();
-            if ($exception->getCode() === '23000') {
-                $winner = $this->orders->findByIdempotencyHash($idempotencyHash);
-                if ($winner !== null) {
-                    return $this->replay($winner, $fingerprint);
-                }
-            }
-            throw $exception;
         } catch (Throwable $exception) {
             $this->rollback();
             throw $exception;
         }
 
-        $stored = $this->orders->findByIdempotencyHash($idempotencyHash);
+        $stored = $this->orders->findByReference($order['reference']);
         if ($stored === null) {
             throw new \RuntimeException('Committed order could not be reloaded.');
         }
 
-        return new CheckoutResult($this->publicOrder($stored, false), $token, false);
+        return new CheckoutResult($this->publicOrder($stored, false), $token);
     }
 
     /** @return array<string, mixed> */
@@ -152,20 +128,6 @@ final readonly class CheckoutService
         }
 
         return $this->publicOrder($order, true);
-    }
-
-    /** @param array<string, mixed> $existing */
-    private function replay(array $existing, string $fingerprint): CheckoutResult
-    {
-        if (($existing['request_fingerprint'] ?? null) !== $fingerprint) {
-            throw new CheckoutException('IDEMPOTENCY_KEY_CONFLICT', 'The idempotency key was already used for a different request.', 409);
-        }
-        $hash = $existing['idempotency_key_hash'] ?? null;
-        if (!is_string($hash)) {
-            throw new \RuntimeException('Invalid stored idempotency credential.');
-        }
-
-        return new CheckoutResult($this->publicOrder($existing, true), $this->tokens->token($hash), true);
     }
 
     /**
@@ -222,16 +184,6 @@ final readonly class CheckoutService
         }
 
         return $safe + $state;
-    }
-
-    /** @param array<string, mixed> $request */
-    private function fingerprint(array $request): string
-    {
-        try {
-            return hash('sha256', json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-        } catch (JsonException $exception) {
-            throw new \RuntimeException('Normalized checkout request could not be fingerprinted.', 0, $exception);
-        }
     }
 
     private function multiply(int $price, int $quantity): int

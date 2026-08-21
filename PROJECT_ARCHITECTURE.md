@@ -309,8 +309,7 @@ Rules:
 - Central Sync URL.
 - Unique site-reporting secret.
 - Logging level.
-- JWT issuer, audience, pinned algorithm, short access-token lifetime, and signing secret.
-- Refresh-token lifetime, host-only cookie settings, and a separate refresh-token hashing secret.
+- JWT signing secret, `HS256` algorithm, and administrator-session lifetime.
 
 Never expose backend secrets through React or commit real credentials.
 
@@ -378,7 +377,7 @@ created_at
 updated_at
 ```
 
-#### `admin_refresh_tokens`
+#### `admin_refresh_tokens` (deprecated)
 
 ```text
 id
@@ -393,7 +392,7 @@ created_at
 updated_at
 ```
 
-Only an HMAC-SHA-256 hash is persisted. The raw token exists only in the administrator's refresh cookie. `family_id` supports logout and rotated-token reuse revocation; `replaced_by_token_id` preserves the rotation chain.
+This legacy table is retained temporarily for historical data and is no longer used by runtime authentication. A later approved retention cleanup may remove it.
 
 #### `business_profiles`
 
@@ -432,7 +431,6 @@ Do not hard-delete a product referenced by an order. Mark it inactive.
 ```text
 id
 reference unique
-idempotency_key unique
 customer_name
 delivery_address
 state
@@ -649,10 +647,9 @@ The confirmation endpoint must use an unguessable access token or another approv
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `POST` | `/api/v1/admin/login` | Issue administrator access and refresh credentials |
-| `POST` | `/api/v1/admin/refresh` | Rotate refresh credential and issue a new access token |
-| `POST` | `/api/v1/admin/logout` | Revoke the current refresh-token family |
+| `POST` | `/api/v1/admin/login` | Issue administrator Bearer JWT |
 | `GET` | `/api/v1/admin/me` | Current merchant user |
+| `POST` | `/api/v1/admin/logout` | Acknowledge an authenticated client-side logout |
 | `GET` | `/api/v1/admin/products` | Paginated product list |
 | `POST` | `/api/v1/admin/products` | Create product |
 | `GET` | `/api/v1/admin/products/{id}` | Product details |
@@ -675,7 +672,7 @@ The confirmation endpoint must use an unguessable access token or another approv
 
 The checkout implementation must use this sequence:
 
-1. Accept customer data, requested product identifiers, quantities and an idempotency key.
+1. Accept customer data, requested product identifiers and quantities.
 2. Validate the customer fields and cart structure.
 3. Load every product and current price from MySQL.
 4. Reject inactive, missing or invalid products.
@@ -692,8 +689,7 @@ Never trust prices, totals, availability or payment status submitted by React.
 
 ### Checkout reliability rules
 
-- Enforce uniqueness on the idempotency key.
-- A repeated request with the same key returns the original order outcome.
+- The frontend disables repeated submission while checkout is in progress. An unusual retry may create a second cash-on-delivery order; this is an approved MVP trade-off.
 - A failure before commit rolls back the order and all items.
 - A failure after commit must not erase or mark the order as failed.
 - Email failure creates a retryable notification record.
@@ -701,26 +697,21 @@ Never trust prices, totals, availability or payment status submitted by React.
 
 ## 17. Merchant authentication
 
-Approved v1 approach: short-lived JWT administrator access tokens with rotating opaque refresh tokens.
+Approved v1 approach: stateless JWT administrator access tokens.
 
 Requirements:
 
 - Use `password_hash()` and `password_verify()`.
-- Return a signed JWT access token after login and refresh; default expiry is 15 minutes.
+- Return a signed JWT access token after login; default expiry is eight hours.
 - Keep access tokens in frontend memory and send them only as `Authorization: Bearer <access-token>`.
 - Never store access tokens in `localStorage`, `sessionStorage`, or backend-managed cookies.
-- Pin the JWT algorithm in trusted configuration and validate signature, issuer, audience, subject, timestamps, JWT ID and token version.
+- Pin `HS256` in trusted configuration and validate JWT signature, subject, and expiry.
 - Put no name, email, business information, password data, or sensitive personal data in a JWT.
-- Use cryptographically random opaque refresh tokens in Secure, `HttpOnly`, host-only cookies with `SameSite=Strict` preferred.
-- Store only HMAC-SHA-256 refresh-token hashes in MySQL using a secret distinct from the JWT signing secret.
-- Rotate refresh tokens after every successful use. Reuse of a rotated token revokes its complete family.
-- Validate same-origin browser requests on login, refresh and logout.
 - Rate-limit login attempts.
 - Use generic invalid-login messages.
-- Revoke the current refresh-token family and expire its cookie during logout.
 - Protect every merchant endpoint with middleware.
 
-JWT was selected by product-owner approval to give the React administrator a short-lived explicit bearer credential while retaining a same-origin, browser-protected renewal mechanism. Customers remain unauthenticated and no public administrator registration exists.
+JWT was selected by product-owner approval to give the React administrator one explicit Bearer credential without cookie-based renewal. `POST /api/v1/admin/logout` validates the credential and records a safe audit event; the frontend then removes the token from its state. The endpoint does not revoke a stateless issued token, which expires naturally. Customers remain unauthenticated and no public administrator registration exists.
 
 ## 18. Product-image handling
 
@@ -787,7 +778,7 @@ The exact grace-period behaviour requires PM and operations approval.
 
 - PDO prepared statements only.
 - Output encoding against XSS.
-- Strict origin validation for refresh-cookie operations and any remaining cookie-authenticated state changes.
+- Normal CORS configuration for configured frontend origins.
 - Authentication and authorization middleware.
 - Login and checkout rate limits.
 - Strict server-side input validation.
@@ -876,7 +867,7 @@ Track at minimum:
 - Browse products -> add to cart -> checkout -> confirmation.
 - Merchant login -> create product -> edit -> deactivate.
 - Merchant order list -> details -> valid status transition.
-- Invalid and expired administrator access-token behaviour, refresh rotation, and rotated-token reuse.
+- Valid, invalid, and expired administrator access-token behaviour.
 
 ### Mandatory checkout regression cases
 
@@ -884,7 +875,7 @@ Track at minimum:
 - Order items contain correct immutable snapshots.
 - A manipulated frontend price cannot change the total.
 - An inactive or missing product is rejected safely.
-- Reusing an idempotency key does not create a second order.
+- Repeated normal checkout submissions create independent orders; the frontend disables its submit control while a request is in progress.
 - A partial database failure rolls back everything.
 - Email failure does not fail a saved order.
 - An unauthenticated user cannot access merchant resources.
@@ -1136,7 +1127,7 @@ Exit gate: an update failure can be recovered without leaving a storefront offli
 | ID | Decision | Owner | Required by |
 |---|---|---|---|
 | D1 | Approve routing, validation, logging, email and testing packages | Backend + PM | Phase 1 |
-| D2 | Resolved 14 August 2026: short-lived JWT administrator access tokens with rotating opaque refresh-token cookies | Backend + frontend | API contract |
+| D2 | Resolved 21 August 2026: stateless HS256 JWT Bearer tokens with an eight-hour default lifetime; no refresh cookies or server-side revocation | Backend + frontend | API contract |
 | D3 | Resolved 13 August 2026: pickup is free; delivery uses one administrator-configured fixed fee in integer kobo | PM | Checkout |
 | D4 | Define allowed order statuses and transitions | PM + operations | Merchant order management |
 | D5 | Resolved 13 August 2026: concise server-built order summary sent to the normalized digits-only business number through a `wa.me` handoff URL | PM | Checkout integration |

@@ -71,9 +71,8 @@ final class PaymentWebhookSecurityTest extends TestCase
             events: $events,
             paystack: $paystack,
             finalizer: $finalizer,
-            tokens: new OrderConfirmationTokenService('sec-key-32-chars-long-test-12345'),
+            tokens: new OrderConfirmationTokenService(),
             references: new PaymentReferenceGenerator(),
-            securitySecret: 'sec-key-32-chars-long-test-12345',
             logger: $logger,
         );
 

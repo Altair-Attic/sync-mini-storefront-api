@@ -74,11 +74,10 @@ final class AdminOrderApiTest extends TestCase
             'id' => $this->productId, 'public_id' => $this->productPublicId, 'slug' => 'order-test-item-' . substr($this->productId, 0, 8),
         ]);
 
-        $this->jwt = new JwtService('admin-order-test-jwt-secret-32-bytes', 'https://test.example', 'https://test.example/admin', 900, 30, 'HS256');
+        $this->jwt = new JwtService('admin-order-test-jwt-secret-32-bytes', 28800, 'HS256');
         $authMiddleware = new AuthenticationMiddleware(
             $this->jwt,
             new MerchantUserRepository($this->db),
-            new RevokedAccessTokenRepository($this->db),
         );
 
         $notificationService = new NotificationService(
@@ -97,7 +96,6 @@ final class AdminOrderApiTest extends TestCase
             ),
             new WhatsAppHandoffService(),
             new NullLogger(),
-            str_repeat('order-admin-security-', 2),
             5,
             false,
         );

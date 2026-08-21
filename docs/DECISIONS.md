@@ -1,5 +1,15 @@
 # Architecture Decisions
 
+## 2026-08-21 — Simplified storefront API security
+
+Status: approved and implemented.
+
+- Merchant administration uses one stateless HS256 JWT Bearer token. It validates signature, subject, and expiry; the default lifetime is eight hours. Logout is a frontend state operation, so issued tokens are not revoked before expiry.
+- Refresh cookies, rotation, refresh-token families, same-origin checks for cookie operations, JWT issuer/audience/JTI/token-version rules, and the revoked-token denylist are removed. The legacy refresh/revocation tables remain temporarily for retention only and are not queried at runtime.
+- Guest checkout no longer requires `Idempotency-Key`. Each accepted submission creates an independent transaction; frontend submit controls must prevent ordinary double clicks. Paystack initialization and webhook event processing remain idempotent.
+- Order confirmation uses a fresh cryptographically random token per order and stores only its SHA-256 hash. No order security secret or deterministic replay credential remains.
+- CLI-only notification processing has no notification security secret. Basic login, checkout, and payment rate limits remain; Paystack verification, webhook HMAC, server-side amounts, and secure uploads are unchanged.
+
 ## 2026-08-14 — Administrator JWT access and rotating refresh credentials
 
 Status: approved for Phase 1.

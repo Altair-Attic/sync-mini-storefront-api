@@ -35,12 +35,11 @@ final readonly class OrderController
         }
         try {
             $request = $this->validator->validate(RequestParser::jsonObject(($this->readBody)()));
-            $idempotencyKey = $this->validator->validateIdempotencyKey($server['HTTP_IDEMPOTENCY_KEY'] ?? null);
             $this->rateLimiter->consumeCheckout($this->ip($server));
-            $result = $this->checkout->create($request, $idempotencyKey);
+            $result = $this->checkout->create($request);
             $data = ['confirmation_token' => $result->confirmationToken] + $result->order;
 
-            return JsonResponse::success($data, $requestId, $result->replay ? 200 : 201, ['idempotent_replay' => $result->replay]);
+            return JsonResponse::success($data, $requestId, 201);
         } catch (JsonException|ValidationException $exception) {
             $fields = $exception instanceof ValidationException ? $exception->fields : [];
 

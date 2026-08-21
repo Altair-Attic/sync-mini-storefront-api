@@ -52,12 +52,11 @@ final class PaymentInitializationApiTest extends TestCase
         ])))->connect();
         (new MigrationRunner($this->db, $root . '/database/migrations'))->run();
 
-        $secret = 'test-security-secret-key-32-chars-long!';
-        $this->tokenService = new OrderConfirmationTokenService($secret);
+        $this->tokenService = new OrderConfirmationTokenService();
 
         $this->orderId = UuidGenerator::v4();
         $this->orderRef = 'SYNC-PAY-' . bin2hex(random_bytes(4));
-        $this->rawToken = $this->tokenService->token('raw-seed-' . $this->orderId);
+        $this->rawToken = $this->tokenService->generate();
         $tokenHash = $this->tokenService->tokenHash($this->rawToken);
 
         $stmt = $this->db->prepare(
@@ -117,7 +116,6 @@ final class PaymentInitializationApiTest extends TestCase
             finalizer: $finalizer,
             tokens: $this->tokenService,
             references: new PaymentReferenceGenerator(),
-            securitySecret: $secret,
             logger: $logger,
         );
         $rateLimiter = new PaymentRateLimiter(new LoginAttemptRepository($this->db), new Config([
@@ -125,7 +123,6 @@ final class PaymentInitializationApiTest extends TestCase
             'checkout.confirmation_max_attempts' => '30',
             'checkout.window_seconds' => '60',
             'checkout.block_seconds' => '300',
-            'checkout.security_secret' => $secret,
         ]));
         $validator = new PaymentInitializationValidator(200);
         $controller = new PaymentController($service, $validator, $rateLimiter);
