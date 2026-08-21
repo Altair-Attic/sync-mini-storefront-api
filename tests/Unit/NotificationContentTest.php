@@ -43,8 +43,10 @@ final class NotificationContentTest extends TestCase
         self::assertNotNull($url);
         self::assertStringStartsWith('https://wa.me/2348035732952?text=', $url);
         $message = rawurldecode((string) parse_url($url, PHP_URL_QUERY));
-        self::assertStringContainsString('Deliver to: 12 Example Street, Ogun', $message);
-        self::assertStringContainsString('Snapshot Product x 2', $message);
+        self::assertStringContainsString('Order ID: #SYNC-TEST', $message);
+        self::assertStringContainsString('2 × Snapshot Product', $message);
+        self::assertStringContainsString('Address: 12 Example Street, Ogun', $message);
+        self::assertStringContainsString('Payment Status: Unpaid', $message);
         self::assertStringNotContainsString('internal-order-id', $message);
         self::assertStringNotContainsString('confirmation', $message);
     }
@@ -66,7 +68,7 @@ final class NotificationContentTest extends TestCase
         $order['state'] = null;
         $url = $service->url($order, $business);
         self::assertNotNull($url);
-        self::assertStringNotContainsString('Deliver to', rawurldecode((string) parse_url($url, PHP_URL_QUERY)));
+        self::assertStringContainsString('Address: Pickup', rawurldecode((string) parse_url($url, PHP_URL_QUERY)));
     }
 
     /** @return array<string, mixed> */

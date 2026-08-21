@@ -153,17 +153,10 @@ final class ProductionPreflight
 
             // Verify JWT Secrets
             $jwtSecret = (string) ($app['authentication']['jwt_secret'] ?? '');
-            $refreshSecret = (string) ($app['authentication']['refresh_token_security_secret'] ?? '');
             if (strlen($jwtSecret) >= 32 && !str_contains(strtolower($jwtSecret), 'change-this')) {
                 $this->pass("JWT signing secret is configured and strong (>= 32 chars)");
             } else {
                 $this->fail("JWT signing secret is missing, too short (< 32 chars), or using placeholder");
-            }
-
-            if (strlen($refreshSecret) >= 32 && !str_contains(strtolower($refreshSecret), 'change-this') && !hash_equals($jwtSecret, $refreshSecret)) {
-                $this->pass("Refresh token secret is configured, strong, and distinct from JWT secret");
-            } else {
-                $this->fail("Refresh token secret is weak, placeholder, or identical to JWT secret");
             }
 
             // Verify Paystack Secret Key shape

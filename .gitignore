@@ -1,5 +1,6 @@
 /.env
 /.env.testing
+.env.production
 /vendor/
 /storage/logs/*
 !/storage/logs/.gitignore

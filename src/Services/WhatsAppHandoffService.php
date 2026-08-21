@@ -24,27 +24,39 @@ final class WhatsAppHandoffService
             return null;
         }
         $lines = [
-            $this->string($business, 'business_name'),
-            'Order ' . $this->string($order, 'reference'),
-            'Customer: ' . $this->string($order, 'customer_name'),
-            'Phone: ' . $this->string($order, 'phone_number'),
-            'Fulfilment: ' . $this->string($order, 'fulfilment_method'),
+            'Hello! I just placed an order on your website.',
+            '',
+            'Order ID: #' . $this->string($order, 'reference'),
+            '',
+            'Order Details',
         ];
-        if (($order['fulfilment_method'] ?? null) === 'delivery') {
-            $lines[] = 'Deliver to: ' . $this->string($order, 'delivery_address') . ', ' . $this->string($order, 'state');
-        }
         $items = $order['items'] ?? [];
         if (is_array($items)) {
             foreach ($items as $item) {
                 if (is_array($item)) {
-                    $lines[] = '- ' . $this->string($item, 'product_title') . ' x ' . $this->integer($item, 'quantity');
+                    $lines[] = '- ' . $this->integer($item, 'quantity') . ' × ' . $this->string($item, 'product_title');
                 }
             }
         }
+        $subtotal = is_int($order['subtotal_kobo'] ?? null) ? $order['subtotal_kobo'] : 0;
+        $deliveryFee = is_int($order['delivery_fee_kobo'] ?? null) ? $order['delivery_fee_kobo'] : 0;
+        if (($order['fulfilment_method'] ?? null) === 'delivery') {
+            $deliveryAddress = $this->string($order, 'delivery_address') . ', ' . $this->string($order, 'state');
+        } else {
+            $deliveryAddress = 'Pickup';
+        }
         $total = is_int($order['total_kobo'] ?? null) ? $order['total_kobo'] : 0;
-        $lines[] = 'Total: NGN ' . number_format(intdiv($total, 100)) . '.' . str_pad((string) ($total % 100), 2, '0', STR_PAD_LEFT);
-        $lines[] = 'Payment: ' . $this->string($order, 'payment_method');
-        $lines[] = 'Status: ' . $this->string($order, 'fulfilment_status');
+        $lines[] = 'Subtotal: ' . $this->money($subtotal);
+        $lines[] = 'Delivery Fee: ' . $this->money($deliveryFee);
+        $lines[] = 'Total: ' . $this->money($total);
+        $lines[] = 'Payment Status: ' . ucfirst($this->string($order, 'payment_status'));
+        $lines[] = '';
+        $lines[] = 'Delivery Details';
+        $lines[] = 'Name: ' . $this->string($order, 'customer_name');
+        $lines[] = 'Address: ' . $deliveryAddress;
+        $lines[] = 'Phone: ' . $this->string($order, 'phone_number');
+        $lines[] = '';
+        $lines[] = 'Kindly confirm that my order has been received and is being processed. Thank you.';
 
         return 'https://wa.me/' . $digits . '?text=' . rawurlencode(implode("\n", $lines));
     }
@@ -69,5 +81,10 @@ final class WhatsAppHandoffService
         }
 
         return $value;
+    }
+
+    private function money(int $kobo): string
+    {
+        return '₦' . number_format(intdiv($kobo, 100)) . '.' . str_pad((string) ($kobo % 100), 2, '0', STR_PAD_LEFT);
     }
 }

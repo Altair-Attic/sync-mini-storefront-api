@@ -36,7 +36,7 @@ Use this checklist to verify every single-tenant merchant installation before op
 
 - [ ] **Dedicated MySQL User**: User has unique high-entropy password and access restricted to merchant database.
 - [ ] **InnoDB & UTF8mb4**: Database collation is `utf8mb4_unicode_ci`.
-- [ ] **Migrations Executed**: All 17 schema migrations applied via `php scripts/migrate.php`.
+- [ ] **Migrations Executed**: All migrations in `database/migrations/` applied via `php scripts/migrate.php`.
 - [ ] **Zero Pending Migrations**: Confirmed with `MigrationRunner::pending() === []`.
 - [ ] **Seed / Initial Profile**: Business profile initialized with merchant name, currency (`NGN`), and delivery options.
 
