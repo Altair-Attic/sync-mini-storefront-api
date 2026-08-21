@@ -171,6 +171,21 @@ final class OrderApiTest extends TestCase
         self::assertSame(201, $created->status);
     }
 
+    public function testCheckoutPreservesTheCustomerSelectedPaystackMethod(): void
+    {
+        $this->body = json_encode([
+            'customer_name' => 'API Contract Customer', 'phone_number' => '+2349035732952', 'customer_email' => 'customer@example.com',
+            'fulfilment_method' => 'pickup', 'delivery_address' => null, 'state' => null,
+            'payment_method' => 'paystack', 'items' => [['product_id' => $this->productPublicId, 'quantity' => 1]],
+        ], JSON_THROW_ON_ERROR);
+        $created = $this->application->handle([
+            'REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/api/v1/orders', 'CONTENT_TYPE' => 'application/json', 'REMOTE_ADDR' => '192.0.2.126',
+        ]);
+
+        self::assertSame(201, $created->status);
+        self::assertSame('paystack', $this->object($created->body['data'] ?? null)['payment_method']);
+    }
+
     public function testCheckoutRejectsUnavailableProducts(): void
     {
         $this->db->prepare('UPDATE products SET is_available = FALSE WHERE id = :id')->execute(['id' => $this->productId]);

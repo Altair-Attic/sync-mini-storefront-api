@@ -10,6 +10,7 @@ use ProjectSync\Controllers\Admin\CurrentAdminController;
 use ProjectSync\Controllers\Admin\OrderManagementController;
 use ProjectSync\Controllers\BusinessProfileController;
 use ProjectSync\Controllers\CategoryController;
+use ProjectSync\Controllers\ContactController;
 use ProjectSync\Controllers\DocumentationController;
 use ProjectSync\Controllers\HealthController;
 use ProjectSync\Controllers\OrderConfirmationController;
@@ -19,6 +20,7 @@ use ProjectSync\Controllers\PaymentWebhookController;
 use ProjectSync\Controllers\ProductController;
 use ProjectSync\Controllers\ProductImageController;
 use ProjectSync\Infrastructure\Auth\JwtService;
+use ProjectSync\Infrastructure\Email\SmtpEmailSender;
 use ProjectSync\Infrastructure\Paystack\CurlPaystackHttpTransport;
 use ProjectSync\Infrastructure\Paystack\PaystackClient;
 use ProjectSync\Middleware\AuthenticationMiddleware;
@@ -39,6 +41,7 @@ use ProjectSync\Services\BusinessProfileService;
 use ProjectSync\Services\CategoryService;
 use ProjectSync\Services\CheckoutRateLimiter;
 use ProjectSync\Services\CheckoutService;
+use ProjectSync\Services\ContactService;
 use ProjectSync\Services\LoginRateLimiter;
 use ProjectSync\Services\OrderConfirmationTokenService;
 use ProjectSync\Services\OrderManagementService;
@@ -52,6 +55,7 @@ use ProjectSync\Services\ProductService;
 use ProjectSync\Validators\BusinessProfileValidator;
 use ProjectSync\Validators\CategoryValidator;
 use ProjectSync\Validators\CheckoutValidator;
+use ProjectSync\Validators\ContactValidator;
 use ProjectSync\Validators\LoginValidator;
 use ProjectSync\Validators\OrderListQueryValidator;
 use ProjectSync\Validators\OrderStatusUpdateValidator;
@@ -207,6 +211,12 @@ final class AppFactory
             $notificationService,
         );
         $checkoutRateLimiter = new CheckoutRateLimiter($attempts, $config);
+        $contactController = new ContactController(
+            new ContactValidator(),
+            new ContactService(new BusinessProfileRepository($connection), new SmtpEmailSender($config), $logger),
+            $checkoutRateLimiter,
+            static function (): string { $body = file_get_contents('php://input'); return is_string($body) ? $body : ''; },
+        );
         $orderController = new OrderController(
             $checkoutValidator,
             $checkoutService,
@@ -297,6 +307,7 @@ final class AppFactory
                 new CurrentAdminController($authenticationMiddleware),
                 $profileController,
                 $categoryController,
+                $contactController,
                 $productController,
                 $productImageController,
                 $orderController,

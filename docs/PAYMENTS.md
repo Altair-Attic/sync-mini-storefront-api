@@ -43,11 +43,11 @@ Checkout and payment initialization remain strictly decoupled into two distinct 
 [Customer Browser]               [Project Sync API]                  [Paystack API]
         |                                |                                  |
  1.     |-- POST /api/v1/orders -------->|                                  |
-        |   (cart, customer info)        |                                  |
+        |   (cart, customer info, payment method)                           |
         |<-- 201 Created ----------------| (Order saved: payment_status = unpaid)
         |   (order reference + token)    |                                  |
         |                                |                                  |
- 2.     |-- POST /orders/{ref}/payments->|                                  |
+ 2.     |-- If payment_method = paystack: POST /orders/{ref}/payments ---->|
         |   (token, Idempotency-Key)     |-- POST /transaction/initialize ->|
         |                                |<-- 200 OK (auth_url, ref) -------|
         |<-- 200/201 (auth_url, ref) ----|                                  |

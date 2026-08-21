@@ -9,6 +9,7 @@ use ProjectSync\Controllers\Admin\CurrentAdminController;
 use ProjectSync\Controllers\Admin\OrderManagementController;
 use ProjectSync\Controllers\BusinessProfileController;
 use ProjectSync\Controllers\CategoryController;
+use ProjectSync\Controllers\ContactController;
 use ProjectSync\Controllers\DocumentationController;
 use ProjectSync\Controllers\HealthController;
 use ProjectSync\Controllers\OrderConfirmationController;
@@ -24,6 +25,7 @@ return static function (
     CurrentAdminController $current,
     BusinessProfileController $profile,
     CategoryController $categories,
+    ContactController $contact,
     ProductController $products,
     ProductImageController $productImages,
     OrderController $orders,
@@ -40,6 +42,7 @@ return static function (
         $current,
         $profile,
         $categories,
+        $contact,
         $products,
         $productImages,
         $orders,
@@ -70,6 +73,7 @@ return static function (
 
         // Orders & Confirmation (Guest)
         $router->addRoute('POST', '/api/v1/orders', [$orders, 'create']);
+        $router->addRoute('POST', '/api/v1/contact', [$contact, 'send']);
         $router->addRoute('GET', '/api/v1/orders/{reference}/confirmation', [$confirmations, 'show']);
 
         // Payments & Webhooks

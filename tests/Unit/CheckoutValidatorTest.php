@@ -50,6 +50,14 @@ final class CheckoutValidatorTest extends TestCase
         self::assertNull($result['state']);
     }
 
+    public function testPaystackPaymentMethodIsPreserved(): void
+    {
+        $input = $this->valid();
+        $input['payment_method'] = 'paystack';
+
+        self::assertSame('paystack', $this->validator->validate($input)['payment_method']);
+    }
+
     /** @param mixed $value */
     #[DataProvider('invalidFields')]
     public function testInvalidCheckoutFieldsAreRejected(string $field, mixed $value): void

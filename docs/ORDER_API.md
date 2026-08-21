@@ -2,7 +2,7 @@
 
 Phase 3 provides guest checkout, token-protected confirmation, persistent email notifications, and a server-generated WhatsApp handoff URL. Customers do not authenticate or receive sessions.
 
-Phase 6A defines the Paystack payment security and architecture specification (see `docs/PAYMENTS.md` and `docs/PAYMENT_SECURITY.md`). Checkout and payment initialization remain strictly decoupled: orders are captured as `payment_status: unpaid` during guest checkout; payment initialization occurs subsequently against `POST /api/v1/orders/{reference}/payments`.
+Phase 6 provides server-authoritative Paystack payment initialization (see `docs/PAYMENTS.md` and `docs/PAYMENT_SECURITY.md`). Checkout and payment initialization remain strictly decoupled: orders are captured as `payment_status: unpaid` during guest checkout; payment initialization occurs subsequently against `POST /api/v1/orders/{reference}/payments`.
 
 
 ## Delivery configuration
@@ -36,7 +36,9 @@ Content-Type: application/json
 
 Pickup requires `delivery_address` and `state` to be `null`. Delivery requires both fields. Unknown fields—including client prices, currency, fees, totals, and payment status—are rejected. Item UUIDs must be unique, quantities must be integers, and configured cart and quantity limits apply.
 
-Product activity and current prices are loaded in one bounded MySQL query. All money is integer Nigerian kobo. The only payment method is `cash_on_delivery`; new orders use payment status `unpaid`, fulfilment status `new`, and currency `NGN` from the business profile.
+Product activity and current prices are loaded in one bounded MySQL query. All money is integer Nigerian kobo. `fulfilment_method` is independently chosen as `pickup` or `delivery`; the business profile decides which of those choices is available. `payment_method` is independently chosen as `cash_on_delivery` or `paystack`. New orders use payment status `unpaid`, fulfilment status `new`, and currency `NGN` from the business profile.
+
+For `cash_on_delivery`, checkout is complete after the order response. For `paystack`, use the returned `reference` and `confirmation_token` to call `POST /api/v1/orders/{reference}/payments` with the confirmation token and a payment-initialization `Idempotency-Key`. The response provides the Paystack `authorization_url`. A browser redirect is never proof of payment; read the local payment status after verified webhook or server-to-server confirmation.
 
 A new order returns HTTP `201` after its database transaction commits, independently of email delivery. The response contains its public reference, a random confirmation token, confirmation-safe customer/order fields, immutable item snapshots, `whatsapp_url`, and safe `notification` state. Internal IDs are never returned.
 
@@ -44,7 +46,7 @@ A new order returns HTTP `201` after its database transaction commits, independe
 
 ## Submission and confirmation behavior
 
-Each accepted checkout request creates its own order transaction. The frontend disables repeated submission during the request; an unusual retry can create another cash-on-delivery order. A failure before commit leaves no order or items.
+Each accepted checkout request creates its own order transaction. The frontend disables repeated submission during the request; an unusual retry can create another order. A failure before commit leaves no order or items.
 
 The confirmation credential is generated with cryptographically secure random bytes for each order. Only its SHA-256 hash is stored; the raw token is returned once in the successful checkout response.
 

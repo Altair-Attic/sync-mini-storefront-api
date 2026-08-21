@@ -198,8 +198,10 @@ paths:
         **Important Rules**:
         1. Client-submitted prices and totals are not accepted or trusted. Backend computes totals strictly from persisted database products and business delivery fee configuration.
         2. If any item is inactive (`is_active = false`) or unavailable (`is_available = false`), checkout is rejected with `422 PRODUCT_UNAVAILABLE`.
-        3. The frontend disables its submit control while the request is in progress. A retry can create another cash-on-delivery order.
-        4. Returns an order reference and a cryptographically random confirmation token.
+        3. `fulfilment_method` is the delivery choice (`pickup` or `delivery`) and is independent of `payment_method`.
+        4. `payment_method` is either `cash_on_delivery` or `paystack`. For `paystack`, create the order first, then initialize payment at `POST /api/v1/orders/{reference}/payments` with the returned confirmation token.
+        5. The frontend disables its submit control while the request is in progress. A retry can create another order.
+        6. Returns an order reference and a cryptographically random confirmation token.
       requestBody:
         required: true
         content:
@@ -225,6 +227,47 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
+
+  /contact:
+    post:
+      tags: [Storefront]
+      summary: Send a message to the merchant
+      operationId: sendContactMessage
+      description: Sends the message to the configured support email when SMTP is available and returns a pre-filled WhatsApp handoff URL. Messages are not stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, message]
+              properties:
+                name: {type: string, minLength: 2, maxLength: 120}
+                email: {type: string, format: email}
+                message: {type: string, minLength: 10, maxLength: 2000}
+      responses:
+        '201':
+          description: Contact message processed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: {type: boolean, example: true}
+                  data:
+                    type: object
+                    required: [email_status, whatsapp_url]
+                    properties:
+                      email_status: {type: string, enum: [sent, unavailable]}
+                      whatsapp_url: {type: [string, 'null'], format: uri}
+                  meta: {$ref: '#/components/schemas/SuccessMeta'}
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /orders/{reference}/confirmation:
     get:
@@ -1948,6 +1991,7 @@ components:
           example: amaka@example.com
         fulfilment_method:
           type: string
+          description: Customer fulfilment choice. `delivery` requires `delivery_address` and `state`; `pickup` requires both values to be null.
           enum: [pickup, delivery]
           example: delivery
         delivery_address:
@@ -1962,13 +2006,9 @@ components:
           example: Lagos
         payment_method:
           type: string
+          description: Customer payment choice. Select `paystack` to initialize a Paystack payment after order creation; select `cash_on_delivery` when no online payment initialization is needed.
           enum: [cash_on_delivery, paystack]
           example: paystack
-        notes:
-          type: string
-          nullable: true
-          maxLength: 500
-          example: Please ring gate bell upon arrival.
         items:
           type: array
           minItems: 1

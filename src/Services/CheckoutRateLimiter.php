@@ -21,6 +21,11 @@ final readonly class CheckoutRateLimiter
         $this->record('checkout', $ip, (int) $this->config->requiredString('checkout.max_attempts'));
     }
 
+    public function consumeContact(string $ip): void
+    {
+        $this->record('contact', $ip, (int) $this->config->requiredString('checkout.max_attempts'));
+    }
+
     public function assertConfirmationAllowed(string $ip, string $reference): void
     {
         $attempt = $this->attempts->find($this->hash('confirmation', $ip . '|' . $reference));

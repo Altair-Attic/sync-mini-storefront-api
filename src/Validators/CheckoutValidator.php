@@ -75,15 +75,16 @@ final readonly class CheckoutValidator
             }
         }
 
-        if (($input['payment_method'] ?? null) !== 'cash_on_delivery') {
-            $errors['payment_method'] = ['Only cash_on_delivery is supported.'];
+        $paymentMethod = $input['payment_method'] ?? null;
+        if (!is_string($paymentMethod) || !in_array($paymentMethod, ['cash_on_delivery', 'paystack'], true)) {
+            $errors['payment_method'] = ['Choose cash_on_delivery or paystack.'];
         }
         $items = $this->items($input['items'] ?? null, $errors);
 
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
-        if (!is_string($name) || !is_string($phone) || !is_string($method)) {
+        if (!is_string($name) || !is_string($phone) || !is_string($method) || !is_string($paymentMethod)) {
             throw new \LogicException('Validated checkout fields have invalid types.');
         }
         usort($items, static fn (array $left, array $right): int => strcmp($left['product_id'], $right['product_id']));
@@ -95,7 +96,7 @@ final readonly class CheckoutValidator
             'fulfilment_method' => $method,
             'delivery_address' => is_string($address) ? $address : null,
             'state' => is_string($state) ? $state : null,
-            'payment_method' => 'cash_on_delivery',
+            'payment_method' => $paymentMethod,
             'items' => $items,
         ];
     }

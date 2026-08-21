@@ -91,7 +91,7 @@ final readonly class CheckoutService
             'delivery_fee_kobo' => $deliveryFee,
             'total_kobo' => $total,
             'currency' => $configuration['currency'],
-            'payment_method' => 'cash_on_delivery',
+            'payment_method' => $request['payment_method'],
             'payment_status' => 'unpaid',
             'fulfilment_status' => 'new',
         ];

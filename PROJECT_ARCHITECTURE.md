@@ -123,7 +123,6 @@ Performance, reliability and security requirements must have objective checks. "
 
 ### 6.2 Deferred from MVP
 
-- Live Paystack checkout.
 - Automated cPanel, domain or database provisioning.
 - Remote update installation.
 - Merchant-facing analytics.
@@ -179,7 +178,7 @@ The central database must not become the operational order database for individu
 
 - SMTP or approved email service for merchant notifications.
 - WhatsApp deep links for manual customer follow-up.
-- Paystack in a later phase.
+- Paystack server-authoritative checkout in Phase 6.
 
 ## 8. Repository and application structure
 
@@ -689,7 +688,7 @@ Never trust prices, totals, availability or payment status submitted by React.
 
 ### Checkout reliability rules
 
-- The frontend disables repeated submission while checkout is in progress. An unusual retry may create a second cash-on-delivery order; this is an approved MVP trade-off.
+- The frontend disables repeated submission while checkout is in progress. An unusual retry may create a second order; this is an approved MVP trade-off.
 - A failure before commit rolls back the order and all items.
 - A failure after commit must not erase or mark the order as failed.
 - Email failure creates a retryable notification record.
@@ -1149,7 +1148,7 @@ Exit gate: an update failure can be recovered without leaving a storefront offli
 9. Pilot one template with one controlled merchant.
 10. Expand templates only after the pilot quality gate passes.
 11. Build the central control plane after storefront operations are stable.
-12. Build automated updates and Paystack only after recovery and version controls are proven.
+12. Build automated updates after recovery and version controls are proven; Paystack is delivered under the Phase 6 payment gate.
 
 ## 32. Change control
 
