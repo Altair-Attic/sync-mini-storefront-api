@@ -53,7 +53,7 @@ final class NotificationServiceTest extends TestCase
         );
         $this->productId = UuidGenerator::v4();
         $this->productPublicId = UuidGenerator::v4();
-        $statement = $this->db->prepare("INSERT INTO products (id, public_id, slug, title, price_kobo, is_active, created_at, updated_at) VALUES (:id, :public_id, :slug, 'Immutable Email Product', 10000, TRUE, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
+        $statement = $this->db->prepare("INSERT INTO products (id, public_id, slug, title, price_kobo, is_active, stock_quantity, created_at, updated_at) VALUES (:id, :public_id, :slug, 'Immutable Email Product', 10000, TRUE, 100, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
         $statement->execute(['id' => $this->productId, 'public_id' => $this->productPublicId, 'slug' => 'notification-test-' . substr($this->productId, 0, 8)]);
     }
 

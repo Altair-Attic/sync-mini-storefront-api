@@ -159,6 +159,53 @@ final readonly class OrderRepository
         return $counts;
     }
 
+    /** @return array{total_sales_kobo: int, total_orders: int, total_products: int, recent_orders: list<array<string, mixed>>, category_sales: list<array{name: string, sales_kobo: int}>} */
+    public function dashboard(): array
+    {
+        $salesStatement = $this->db->prepare("SELECT COALESCE(SUM(CASE WHEN fulfilment_status <> 'cancelled' AND ((payment_method = 'cash_on_delivery') OR payment_status = 'paid') THEN total_kobo ELSE 0 END), 0) AS total_sales_kobo, COUNT(*) AS total_orders FROM orders");
+        $salesStatement->execute();
+        $sales = $salesStatement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($sales)) {
+            throw new RuntimeException('Invalid dashboard totals.');
+        }
+        $productStatement = $this->db->prepare('SELECT COUNT(*) FROM products');
+        $productStatement->execute();
+        $productCount = $productStatement->fetchColumn();
+        $recentStatement = $this->db->prepare('SELECT id, reference, customer_name, total_kobo, currency, payment_method, payment_status, fulfilment_status, created_at, updated_at FROM orders ORDER BY created_at DESC, id DESC LIMIT 5');
+        $recentStatement->execute();
+        $recent = $recentStatement->fetchAll(PDO::FETCH_ASSOC);
+        $categoryStatement = $this->db->prepare("SELECT COALESCE(c.name, 'Uncategorised') AS name, COALESCE(SUM(CASE WHEN o.fulfilment_status <> 'cancelled' AND (o.payment_method = 'cash_on_delivery' OR o.payment_status = 'paid') THEN oi.line_total_kobo ELSE 0 END), 0) AS sales_kobo FROM order_items oi INNER JOIN orders o ON o.id = oi.order_id LEFT JOIN products p ON p.id = oi.product_id LEFT JOIN categories c ON c.id = p.category_id GROUP BY c.id, c.name HAVING sales_kobo > 0 ORDER BY sales_kobo DESC, name ASC LIMIT 10");
+        $categoryStatement->execute();
+        $categories = $categoryStatement->fetchAll(PDO::FETCH_ASSOC);
+
+        $recentOrders = [];
+        foreach ($recent as $row) {
+            if (is_array($row)) {
+                $record = [];
+                foreach ($row as $key => $value) {
+                    if (is_string($key)) {
+                        $record[$key] = $value;
+                    }
+                }
+                $recentOrders[] = $record;
+            }
+        }
+        $categorySales = [];
+        foreach ($categories as $row) {
+            if (is_array($row) && is_string($row['name'] ?? null) && (is_string($row['sales_kobo'] ?? null) || is_int($row['sales_kobo'] ?? null))) {
+                $categorySales[] = ['name' => $row['name'], 'sales_kobo' => (int) $row['sales_kobo']];
+            }
+        }
+
+        return [
+            'total_sales_kobo' => is_numeric($sales['total_sales_kobo'] ?? null) ? (int) $sales['total_sales_kobo'] : 0,
+            'total_orders' => is_numeric($sales['total_orders'] ?? null) ? (int) $sales['total_orders'] : 0,
+            'total_products' => is_numeric($productCount) ? (int) $productCount : 0,
+            'recent_orders' => $recentOrders,
+            'category_sales' => $categorySales,
+        ];
+    }
+
     /**
      * @param array{page: int, per_page: int, status: string|null, search: string|null, sort: string, date_from: string|null, date_to: string|null} $filters
      * @param list<string> $conditions

@@ -49,6 +49,7 @@ final class MigrationRunnerTest extends TestCase
             '202608170016_create_payment_attempts_table',
             '202608170017_create_payment_events_table',
             '202608210018_retire_checkout_idempotency_columns',
+            '202608210019_add_stock_quantity_to_products',
         ], $executed);
 
     }

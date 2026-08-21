@@ -45,7 +45,7 @@ final class CheckoutServiceTest extends TestCase
         $this->db->exec('UPDATE business_profiles SET delivery_enabled = TRUE, pickup_enabled = TRUE, fixed_delivery_fee_kobo = 150000, currency = \'NGN\'');
         $this->productId = UuidGenerator::v4();
         $this->productPublicId = UuidGenerator::v4();
-        $statement = $this->db->prepare('INSERT INTO products (id, public_id, slug, title, price_kobo, is_active, created_at, updated_at) VALUES (:id, :public_id, :slug, :title, 250000, TRUE, UTC_TIMESTAMP(), UTC_TIMESTAMP())');
+        $statement = $this->db->prepare('INSERT INTO products (id, public_id, slug, title, price_kobo, is_active, stock_quantity, created_at, updated_at) VALUES (:id, :public_id, :slug, :title, 250000, TRUE, 100, UTC_TIMESTAMP(), UTC_TIMESTAMP())');
         $statement->execute(['id' => $this->productId, 'public_id' => $this->productPublicId, 'slug' => 'checkout-test-' . substr($this->productId, 0, 8), 'title' => 'Checkout Snapshot Product']);
         $orders = new OrderRepository($this->db);
         $items = new OrderItemRepository($this->db);

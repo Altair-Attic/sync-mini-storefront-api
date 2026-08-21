@@ -4,7 +4,7 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
 
 ## Public endpoints
 
-`GET /api/v1/products` is unauthenticated and supports `category`, `page`, `per_page`, and `sort`. Page defaults to 1, `per_page` to 20 (maximum 100), and sort to `display_order`. Sort values are `display_order`, `title`, `price_low`, `price_high`, and `newest`. An unknown or inactive category produces an empty page. Every result is active (`is_active = TRUE`); inactive category information is represented as `category: null`. The `is_available` boolean indicates whether customers can order the item (active but unavailable items remain visible with `is_available: false`).
+`GET /api/v1/products` is unauthenticated and supports `category`, `page`, `per_page`, and `sort`. Page defaults to 1, `per_page` to 20 (maximum 100), and sort to `display_order`. Sort values are `display_order`, `title`, `price_low`, `price_high`, and `newest`. An unknown or inactive category produces an empty page. Every result is active (`is_active = TRUE`); inactive category information is represented as `category: null`. `stock_quantity` is the current tracked quantity. `is_available` is false when the manual availability switch is disabled or stock is zero; unavailable products remain visible.
 
 ```json
 {
@@ -18,6 +18,7 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
     "currency": "NGN",
     "image_url": "https://store.example.com/uploads/products/generated.webp",
     "is_available": true,
+    "stock_quantity": 12,
     "display_order": 0,
     "category": null
   }],
@@ -41,9 +42,9 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
 
 All admin endpoints require an administrator JWT in `Authorization: Bearer <access-token>`. Listing supports `category_id`, `status=active|inactive|all` (default `all`), `availability=available|unavailable|all` (default `all`), bounded `search`, the public pagination fields, and all public sort modes.
 
-POST and PUT are full representations. `category_id` is nullable and must identify an active category when assigning or changing the assignment. Existing assignments survive category deactivation. `slug` may be generated from `title`, which is trimmed and 2–160 characters. `description` is nullable and limited to 10,000 characters. `price_kobo` must be a JSON integer at least zero. `image_url` is nullable and must be HTTPS or an application-managed absolute path. `is_active` is boolean (default true), `is_available` is boolean (default true), and `display_order` is a non-negative integer. Unknown fields and immutable `id`, `public_id`, `created_at`, `updated_at`, and `currency` are rejected.
+POST and PUT are full representations. `category_id` is nullable and must identify an active category when assigning or changing the assignment. Existing assignments survive category deactivation. `slug` may be generated from `title`, which is trimmed and 2–160 characters. `description` is nullable and limited to 10,000 characters. `price_kobo` must be a JSON integer at least zero. `image_url` is nullable and must be HTTPS or an application-managed absolute path. `is_active` is boolean (default true), `is_available` is the manual availability switch (default true), and `stock_quantity` is a non-negative JSON integer (default `0`). Existing products are migrated with stock `0`; set stock to a positive amount before customers can buy them. `display_order` is a non-negative integer. Unknown fields and immutable `id`, `public_id`, `created_at`, `updated_at`, and `currency` are rejected.
 
-`PATCH /api/v1/admin/products/{id}/availability` accepts `{"available": boolean}` or `{"is_available": boolean}` to mutate ordering availability quickly without submitting a complete representation.
+`PATCH /api/v1/admin/products/{id}/availability` accepts `{"available": boolean}` or `{"is_available": boolean}` to mutate the manual availability switch quickly without submitting a complete representation. It never bypasses stock: a zero-stock product remains unavailable.
 
 DELETE permanently removes a product when it has no order history. If an order item references it, DELETE archives it by setting `is_active=false` instead, preserving the immutable order snapshot. The response contains `action` (`deleted` or `archived`) and a clear `message`; archived responses also include the inactive product.
 

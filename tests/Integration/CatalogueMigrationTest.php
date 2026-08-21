@@ -44,16 +44,18 @@ final class CatalogueMigrationTest extends TestCase
     {
         $runner = new MigrationRunner($this->db, dirname(__DIR__, 2) . '/database/migrations');
         self::assertSame([], $runner->run());
-        $statement = $this->db->prepare('SELECT migration FROM schema_migrations WHERE migration IN (:category, :product, :availability) ORDER BY migration');
+        $statement = $this->db->prepare('SELECT migration FROM schema_migrations WHERE migration IN (:category, :product, :availability, :stock) ORDER BY migration');
         $statement->execute([
             'category' => '202608130005_create_categories_table',
             'product' => '202608130006_create_products_table',
             'availability' => '202608170015_add_is_available_to_products',
+            'stock' => '202608210019_add_stock_quantity_to_products',
         ]);
         self::assertSame([
             '202608130005_create_categories_table',
             '202608130006_create_products_table',
             '202608170015_add_is_available_to_products',
+            '202608210019_add_stock_quantity_to_products',
         ], $statement->fetchAll(PDO::FETCH_COLUMN));
     }
 
@@ -80,6 +82,7 @@ final class CatalogueMigrationTest extends TestCase
         $columns->execute();
         $columnNames = array_column($columns->fetchAll(PDO::FETCH_ASSOC), 'COLUMN_NAME');
         self::assertContains('is_available', $columnNames);
+        self::assertContains('stock_quantity', $columnNames);
     }
 
     public function testUniqueCategoryAndProductValuesAreEnforced(): void

@@ -21,9 +21,13 @@ final class ProductValidatorTest extends TestCase
         self::assertNull($result['category_id']);
         self::assertTrue($result['is_active']);
         self::assertTrue($result['is_available']);
+        self::assertSame(0, $result['stock_quantity']);
 
         $explicit = (new ProductValidator())->validate(['title' => 'Unavailable Bag', 'price_kobo' => 100000, 'is_available' => false]);
         self::assertFalse($explicit['is_available']);
+
+        $stocked = (new ProductValidator())->validate(['title' => 'Stocked Bag', 'price_kobo' => 100000, 'stock_quantity' => 12]);
+        self::assertSame(12, $stocked['stock_quantity']);
     }
 
     #[DataProvider('invalidFields')]
@@ -50,6 +54,8 @@ final class ProductValidatorTest extends TestCase
         yield 'invalid slug' => ['slug', 'Bad Slug'];
         yield 'non-bool is_active' => ['is_active', 'yes'];
         yield 'non-bool is_available' => ['is_available', 'no'];
+        yield 'negative stock quantity' => ['stock_quantity', -1];
+        yield 'decimal stock quantity' => ['stock_quantity', 1.5];
         yield 'unknown field' => ['stock', 4];
         yield 'immutable currency' => ['currency', 'NGN'];
     }

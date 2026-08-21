@@ -19,6 +19,7 @@ info:
     - **Product Availability vs Active Status**:
       - `is_active = false`: Product is hidden publicly and cannot be ordered.
       - `is_active = true, is_available = false`: Product is visible in public catalogue with `is_available = false`, but checkout will reject purchase.
+      - A product is also unavailable when `stock_quantity` is zero. Existing products receive zero stock when this feature is deployed and must be stocked by an administrator.
 
 servers:
   - url: /api/v1
@@ -197,7 +198,7 @@ paths:
         
         **Important Rules**:
         1. Client-submitted prices and totals are not accepted or trusted. Backend computes totals strictly from persisted database products and business delivery fee configuration.
-        2. If any item is inactive (`is_active = false`) or unavailable (`is_available = false`), checkout is rejected with `422 PRODUCT_UNAVAILABLE`.
+        2. If any item is inactive or manually unavailable, checkout is rejected with `422 PRODUCT_UNAVAILABLE`. If stock is insufficient, checkout is rejected with `422 INSUFFICIENT_STOCK` and creates no order.
         3. `fulfilment_method` is the delivery choice (`pickup` or `delivery`) and is independent of `payment_method`.
         4. `payment_method` is either `cash_on_delivery` or `paystack`. For `paystack`, create the order first, then initialize payment at `POST /api/v1/orders/{reference}/payments` with the returned confirmation token.
         5. The frontend disables its submit control while the request is in progress. A retry can create another order.
@@ -1784,6 +1785,7 @@ components:
         - image_url
         - is_active
         - is_available
+        - stock_quantity
         - display_order
         - created_at
         - updated_at
@@ -1831,8 +1833,13 @@ components:
           example: true
         is_available:
           type: boolean
-          description: When false, visible in catalogue with is_available=false, but rejected during checkout
+          description: False when manually disabled or when stock_quantity is zero; unavailable products remain visible in the catalogue
           example: true
+        stock_quantity:
+          type: integer
+          minimum: 0
+          description: Current units in stock. Checkout atomically deducts purchased units.
+          example: 12
         display_order:
           type: integer
           example: 0
@@ -1881,6 +1888,12 @@ components:
           type: boolean
           default: true
           example: true
+        stock_quantity:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Units in stock. Defaults to zero, so set this before the product can be purchased.
+          example: 12
         display_order:
           type: integer
           minimum: 0
@@ -1892,7 +1905,7 @@ components:
       properties:
         is_available:
           type: boolean
-          description: Canonical boolean flag controlling whether the product can be ordered
+          description: Canonical manual availability switch. A product still cannot be ordered if stock_quantity is zero.
           example: false
         available:
           type: boolean

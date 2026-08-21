@@ -59,6 +59,7 @@ final class OrderApiTest extends TestCase
         $this->productPublicId = UuidGenerator::v4();
         $insert = $this->db->prepare('INSERT INTO products (id, public_id, slug, title, price_kobo, is_active, created_at, updated_at) VALUES (:id, :public_id, :slug, \'API Product\', 10000, TRUE, UTC_TIMESTAMP(), UTC_TIMESTAMP())');
         $insert->execute(['id' => $this->productId, 'public_id' => $this->productPublicId, 'slug' => 'order-api-' . substr($this->productId, 0, 8)]);
+        $this->db->prepare('UPDATE products SET stock_quantity = 100 WHERE id = :id')->execute(['id' => $this->productId]);
 
         $config = new Config([
             'app.environment' => 'testing', 'app.debug' => false, 'cors.allowed_origins' => [],

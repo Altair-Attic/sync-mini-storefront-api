@@ -107,6 +107,7 @@ return static function (
         $router->addRoute('POST', '/api/v1/admin/products/{id}/image', [$productImages, 'upload']);
 
         // Admin Orders & Fulfilment
+        $router->addRoute('GET', '/api/v1/admin/dashboard', [$orderAdmin, 'dashboard']);
         $router->addRoute('GET', '/api/v1/admin/orders', [$orderAdmin, 'list']);
         $router->addRoute('GET', '/api/v1/admin/orders/summary', [$orderAdmin, 'summary']);
         $router->addRoute('GET', '/api/v1/admin/orders/{id}', [$orderAdmin, 'detail']);

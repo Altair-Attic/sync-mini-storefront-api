@@ -87,6 +87,35 @@ final readonly class OrderManagementService
         return $this->orders->summaryCounts();
     }
 
+    /** @return array<string, mixed> */
+    public function dashboard(): array
+    {
+        $dashboard = $this->orders->dashboard();
+        $recentOrders = [];
+        $activity = [];
+        foreach ($dashboard['recent_orders'] as $order) {
+            $formatted = $this->formatOrderSummary($order);
+            $recentOrders[] = $formatted;
+            $activity[] = [
+                'type' => 'order_created',
+                'message' => 'Order ' . $this->string($formatted, 'reference') . ' was placed.',
+                'order_id' => $this->string($formatted, 'id'),
+                'created_at' => $this->string($formatted, 'created_at'),
+            ];
+        }
+
+        return [
+            'totals' => [
+                'sales_kobo' => $dashboard['total_sales_kobo'],
+                'orders' => $dashboard['total_orders'],
+                'products' => $dashboard['total_products'],
+            ],
+            'recent_orders' => $recentOrders,
+            'category_sales' => $dashboard['category_sales'],
+            'recent_activity' => $activity,
+        ];
+    }
+
     /**
      * @param array<string, mixed> $input
      * @return array{order: array<string, mixed>, unchanged: bool}

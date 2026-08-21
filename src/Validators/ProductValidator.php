@@ -9,14 +9,14 @@ use ProjectSync\Exceptions\ValidationException;
 final class ProductValidator
 {
     /** @var list<string> */
-    private const array FIELDS = ['category_id', 'slug', 'title', 'description', 'price_kobo', 'image_url', 'is_active', 'is_available', 'display_order'];
+    private const array FIELDS = ['category_id', 'slug', 'title', 'description', 'price_kobo', 'image_url', 'is_active', 'is_available', 'stock_quantity', 'display_order'];
 
     /** @var list<string> */
     private const array IMMUTABLE = ['id', 'public_id', 'created_at', 'updated_at', 'currency'];
 
     /**
      * @param array<string, mixed> $input
-     * @return array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, is_available: bool, display_order: int}
+     * @return array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, is_available: bool, stock_quantity: int, display_order: int}
      */
     public function validate(array $input): array
     {
@@ -67,6 +67,10 @@ final class ProductValidator
             $errors['is_available'] = ['Enter true or false.'];
             $isAvailable = true;
         }
+        $stockQuantity = $input['stock_quantity'] ?? 0;
+        if (!is_int($stockQuantity) || $stockQuantity < 0) {
+            $errors['stock_quantity'] = ['Enter a non-negative whole number.'];
+        }
         $displayOrder = $input['display_order'] ?? 0;
         if (!is_int($displayOrder) || $displayOrder < 0) {
             $errors['display_order'] = ['Enter an integer of at least 0.'];
@@ -85,6 +89,7 @@ final class ProductValidator
             'image_url' => is_string($imageUrl) ? $imageUrl : null,
             'is_active' => $isActive,
             'is_available' => $isAvailable,
+            'stock_quantity' => $stockQuantity,
             'display_order' => $displayOrder,
         ];
     }

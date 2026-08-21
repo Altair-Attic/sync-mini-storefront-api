@@ -58,6 +58,9 @@ final readonly class CheckoutService
             if ($product === null || !$product['is_active'] || !$product['is_available']) {
                 throw new CheckoutException('PRODUCT_UNAVAILABLE', 'One or more products are unavailable.', 422);
             }
+            if ($product['stock_quantity'] < $item['quantity']) {
+                throw new CheckoutException('INSUFFICIENT_STOCK', 'One or more products do not have enough stock.', 422);
+            }
             $lineTotal = $this->multiply($product['price_kobo'], $item['quantity']);
             $subtotal = $this->add($subtotal, $lineTotal);
             $snapshots[] = [
@@ -102,6 +105,11 @@ final readonly class CheckoutService
 
         try {
             $this->db->beginTransaction();
+            foreach ($snapshots as $snapshot) {
+                if (!$this->products->decrementStock($snapshot['product_id'], $snapshot['quantity'])) {
+                    throw new CheckoutException('INSUFFICIENT_STOCK', 'One or more products do not have enough stock.', 422);
+                }
+            }
             $this->orders->insert($order);
             $this->orderItems->insertMany($snapshots);
             $this->db->commit();

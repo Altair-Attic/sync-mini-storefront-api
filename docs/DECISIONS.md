@@ -77,6 +77,14 @@ Status: approved for MVP.
 - Category rules: Products can only be assigned to existing, active categories. Deactivating a category preserves historical product assignments, but public product responses display `category: null`.
 - Admin endpoints require Bearer JWT authentication and support product CRUD, bounded listing with `status`, `availability`, `category_id`, and `search` filters, and dedicated availability toggling via `PATCH /api/v1/admin/products/{id}/availability`.
 
+## 2026-08-21 — Product stock tracking
+
+Status: approved.
+
+- Products have a non-negative `stock_quantity`, defaulting to `0`. The migration deliberately leaves every existing product at zero, requiring a merchant to set its actual stock before it becomes purchasable.
+- Public and admin responses calculate `is_available` from both the manual `is_available` switch and `stock_quantity > 0`; out-of-stock products remain visible but cannot be ordered.
+- Checkout validates stock before computing the order and performs a conditional stock decrement inside the same transaction that writes the order and item snapshots. If a concurrent checkout has consumed the remaining stock, the entire attempt rolls back with `422 INSUFFICIENT_STOCK`.
+
 ## 2026-08-17 — Phase 6A / 6A.1 Paystack payment architecture and delivery sequence realignment
 
 Status: approved for Phase 6.

@@ -70,6 +70,20 @@ final readonly class OrderManagementController
      * @param array<string, mixed> $server
      * @param array<string, string> $route
      */
+    public function dashboard(string $requestId, array $server, array $route = []): HttpResponse
+    {
+        $administrator = $this->authentication->requireAdministrator($requestId, $server);
+        if ($administrator instanceof HttpResponse) {
+            return $administrator;
+        }
+
+        return JsonResponse::success(['dashboard' => $this->orders->dashboard()], $requestId, 200);
+    }
+
+    /**
+     * @param array<string, mixed> $server
+     * @param array<string, string> $route
+     */
     public function detail(string $requestId, array $server, array $route): HttpResponse
     {
         $administrator = $this->authentication->requireAdministrator($requestId, $server);
