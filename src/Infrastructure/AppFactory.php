@@ -164,7 +164,7 @@ final class AppFactory
             (int) $config->requiredString('auth.refresh_token_ttl_seconds'),
             $logger,
         );
-        $authenticationMiddleware = new AuthenticationMiddleware($jwt, $users, $revokedAccessTokens);
+        $authenticationMiddleware = new AuthenticationMiddleware($jwt, $users, $revokedAccessTokens, $logger);
         $refreshCookie = new RefreshCookie(
             $config->requiredString('auth.refresh_cookie_name'),
             $config->requiredString('auth.refresh_cookie_path'),

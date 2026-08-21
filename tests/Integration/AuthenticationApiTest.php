@@ -166,6 +166,22 @@ final class AuthenticationApiTest extends TestCase
         self::assertSame(401, $inactive->status);
     }
 
+    public function testBearerTokenForwardedByApacheRewriteIsAccepted(): void
+    {
+        $token = $this->jwt->issue($this->administratorId)['access_token'];
+
+        $response = $this->request(
+            'GET',
+            '/api/v1/admin/me',
+            null,
+            ['REDIRECT_HTTP_AUTHORIZATION' => 'Bearer ' . $token],
+        );
+
+        self::assertSame(200, $response->status);
+        $administrator = $this->object($this->data($response)['administrator'] ?? null);
+        self::assertSame($this->administratorId, $administrator['id'] ?? null);
+    }
+
     public function testRefreshRotationReuseDetectionAndLogoutLifecycle(): void
     {
         $first = $this->login();
