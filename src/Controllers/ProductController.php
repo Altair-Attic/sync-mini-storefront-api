@@ -161,7 +161,7 @@ final readonly class ProductController
             return $failure;
         }
         try {
-            return JsonResponse::success($this->products->deactivate($route['id'] ?? ''), $requestId);
+            return JsonResponse::success($this->products->delete($route['id'] ?? ''), $requestId);
         } catch (ProductNotFoundException) {
             return $this->notFound($requestId);
         }

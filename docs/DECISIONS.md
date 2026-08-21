@@ -1,5 +1,13 @@
 # Architecture Decisions
 
+## 2026-08-21 — Product deletion policy
+
+Status: approved and implemented.
+
+- `DELETE /api/v1/admin/products/{id}` permanently removes a product only when no `order_items` record references it.
+- A product referenced by an existing order is archived (`is_active = FALSE`) instead; immutable order-item snapshots remain intact.
+- The response always includes an `action` and human-readable `message` so the merchant knows whether deletion or archival occurred.
+
 ## 2026-08-21 — Simplified storefront API security
 
 Status: approved and implemented.

@@ -121,6 +121,16 @@ Run all forward-only schema migrations:
 php scripts/migrate.php
 ```
 
+### Step 6.1: Bootstrap the Merchant Profile
+
+For a fresh merchant database, run the interactive bootstrap command from SSH:
+
+```bash
+/opt/alt/php83/usr/bin/php scripts/bootstrap-merchant.php
+```
+
+It securely prompts for the profile and, only if no administrator exists, the first administrator. It never overwrites an existing profile or administrator. Do not put the administrator password in shell history, environment variables, or command-line arguments.
+
 ### Step 7: Run Production Preflight Verification
 
 Verify server configuration, extensions, write permissions, and database connectivity:
@@ -163,11 +173,12 @@ When updating an existing production deployment to a new release:
    Sync updated application code into `/home/username/project-sync-api/`, preserving `.env`, `storage/uploads/`, and `storage/logs/`.
 3. **Update Dependencies**:
    ```bash
-   composer install --no-dev --optimize-autoloader --no-interaction
-   ```
+composer install --no-dev --optimize-autoloader --no-interaction
+```
 4. **Execute Forward Migrations**:
    ```bash
    php scripts/migrate.php
+   /opt/alt/php83/usr/bin/php scripts/bootstrap-merchant.php
    ```
 5. **Run Preflight & Smoke Tests**:
    ```bash

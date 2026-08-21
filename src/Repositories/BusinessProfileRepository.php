@@ -35,6 +35,27 @@ final readonly class BusinessProfileRepository
     }
 
     /**
+     * Creates the one profile that belongs to an isolated merchant installation.
+     *
+     * @param array{business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, order_notification_email: string|null, merchant_email_notifications_enabled: bool, customer_email_notifications_enabled: bool, whatsapp_handoff_enabled: bool, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int} $profile
+     */
+    public function createInitialProfile(array $profile): void
+    {
+        $statement = $this->db->prepare(
+            'INSERT INTO business_profiles ('
+            . 'id, business_name, slug, domain, whatsapp_number, support_email, order_notification_email, '
+            . 'merchant_email_notifications_enabled, customer_email_notifications_enabled, whatsapp_handoff_enabled, '
+            . 'logo_url, template_id, currency, timezone, delivery_enabled, pickup_enabled, fixed_delivery_fee_kobo, created_at, updated_at'
+            . ') VALUES ('
+            . ':id, :business_name, :slug, :domain, :whatsapp_number, :support_email, :order_notification_email, '
+            . ':merchant_email_notifications_enabled, :customer_email_notifications_enabled, :whatsapp_handoff_enabled, '
+            . ':logo_url, :template_id, :currency, :timezone, :delivery_enabled, :pickup_enabled, :fixed_delivery_fee_kobo, UTC_TIMESTAMP(), UTC_TIMESTAMP()'
+            . ')'
+        );
+        $statement->execute(['id' => UuidGenerator::v4()] + $profile);
+    }
+
+    /**
      * @return array{id: string, business_name: string, slug: string, domain: string, whatsapp_number: string, support_email: string|null, logo_url: string|null, template_id: string, currency: string, timezone: string, delivery_enabled: bool, pickup_enabled: bool, fixed_delivery_fee_kobo: int, created_at: string, updated_at: string}|null
      */
     public function findProfile(): ?array

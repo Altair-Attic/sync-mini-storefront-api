@@ -14,6 +14,7 @@ final readonly class ProductImageValidator
         'image/jpeg' => 'jpg',
         'image/png' => 'png',
         'image/webp' => 'webp',
+        'image/avif' => 'avif',
     ];
 
     public function __construct(private int $maximumBytes)
@@ -43,7 +44,7 @@ final readonly class ProductImageValidator
         }
         $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
         if (!is_string($mime) || !isset(self::EXTENSIONS[$mime])) {
-            throw new UploadException('UNSUPPORTED_MEDIA_TYPE', 415, 'Only JPEG, PNG, and WebP images are supported.');
+            throw new UploadException('UNSUPPORTED_MEDIA_TYPE', 415, 'Only JPEG, PNG, WebP, and AVIF images are supported.');
         }
 
         return ['temporary_path' => $path, 'mime_type' => $mime, 'extension' => self::EXTENSIONS[$mime], 'size' => $size];

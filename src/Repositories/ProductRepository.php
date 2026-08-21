@@ -198,6 +198,20 @@ final readonly class ProductRepository
         $statement->execute(['id' => $id]);
     }
 
+    public function isReferencedByOrder(string $id): bool
+    {
+        $statement = $this->db->prepare('SELECT 1 FROM order_items WHERE product_id = :id LIMIT 1');
+        $statement->execute(['id' => $id]);
+
+        return $statement->fetchColumn() !== false;
+    }
+
+    public function delete(string $id): void
+    {
+        $statement = $this->db->prepare('DELETE FROM products WHERE id = :id');
+        $statement->execute(['id' => $id]);
+    }
+
     /**
      * @param array{category_id: string|null, slug: string, title: string, description: string|null, price_kobo: int, image_url: string|null, is_active: bool, is_available: bool, display_order: int} $product
      * @return array<string, int|string|null>

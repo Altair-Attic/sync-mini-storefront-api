@@ -165,7 +165,7 @@ final class AppFactory
             },
         );
         $productController = new ProductController(
-            new ProductService($products, $categories, new ProductValidator(), new ProductListQueryValidator()),
+            new ProductService($products, $categories, new ProductValidator(), new ProductListQueryValidator(), $config->requiredString('app.url')),
             $authenticationMiddleware,
             static function (): string {
                 $body = file_get_contents('php://input');

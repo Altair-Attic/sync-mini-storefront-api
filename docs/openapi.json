@@ -1357,9 +1357,9 @@
                 "tags": [
                     "Admin Products"
                 ],
-                "summary": "Deactivate product",
+                "summary": "Delete product",
                 "operationId": "deleteAdminProduct",
-                "description": "Soft-deactivates product (`is_active = false`). It is immediately hidden from public storefront and slug lookup.",
+                "description": "Permanently deletes products with no order history. Products referenced by existing orders are archived (`is_active = false`) to preserve immutable order history. The response action and message explain the outcome.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -1367,11 +1367,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Product deactivated",
+                        "description": "Product deleted or archived",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AdminProductDetailResponse"
+                                    "$ref": "#/components/schemas/ProductDeletionResponse"
                                 }
                             }
                         }
@@ -1449,7 +1449,7 @@
                 ],
                 "summary": "Upload product image",
                 "operationId": "uploadProductImage",
-                "description": "Uploads a primary product image file (`multipart/form-data`).\nValidates MIME types (`image/jpeg`, `image/png`, `image/webp`), enforces 5MB limit, and updates `image_url`.\n",
+                "description": "Uploads a primary product image file (`multipart/form-data`).\nValidates MIME types (`image/jpeg`, `image/png`, `image/webp`, `image/avif`), enforces 5MB limit, and updates `image_url`.\n",
                 "security": [
                     {
                         "bearerAuth": []
@@ -2895,6 +2895,53 @@
                     }
                 }
             },
+            "ProductDeletionResponse": {
+                "type": "object",
+                "required": [
+                    "success",
+                    "data",
+                    "meta"
+                ],
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "const": true
+                    },
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "action",
+                            "message",
+                            "product"
+                        ],
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": [
+                                    "deleted",
+                                    "archived"
+                                ]
+                            },
+                            "message": {
+                                "type": "string"
+                            },
+                            "product": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/Product"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/SuccessMeta"
+                    }
+                }
+            },
             "CheckoutItemInput": {
                 "type": "object",
                 "required": [
@@ -4021,8 +4068,8 @@
                         "example": {
                             "success": false,
                             "error": {
-                                "code": "PROFILE_NOT_FOUND",
-                                "message": "Store profile not configured."
+                                "code": "BUSINESS_PROFILE_NOT_FOUND",
+                                "message": "The business profile was not found."
                             },
                             "meta": {
                                 "request_id": "req_66c1f8a2b3c4d"

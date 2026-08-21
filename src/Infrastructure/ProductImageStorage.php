@@ -36,18 +36,20 @@ final readonly class ProductImageStorage
         if ($dimensions === false) {
             throw new UploadException('UNSUPPORTED_MEDIA_TYPE', 415, 'The uploaded file is not a valid image.');
         }
-        $useWebp = function_exists('imagewebp') && function_exists('imagecreatefromstring');
+        $useWebp = function_exists('imagewebp')
+            && function_exists('imagecreatefromstring')
+            && ($upload['mime_type'] !== 'image/avif' || function_exists('imagecreatefromavif'));
         $extension = $useWebp ? 'webp' : $upload['extension'];
         $filename = bin2hex(random_bytes(24)) . '.' . $extension;
         $target = $this->storagePath . DIRECTORY_SEPARATOR . $filename;
         try {
             $stored = $useWebp
-                ? $this->convertToWebp($upload['temporary_path'], $target, (int) $dimensions[0], (int) $dimensions[1])
+                ? $this->convertToWebp($upload['temporary_path'], $upload['mime_type'], $target, (int) $dimensions[0], (int) $dimensions[1])
                 : ($this->moveUpload)($upload['temporary_path'], $target);
             if (!$stored) {
                 throw new RuntimeException('The image could not be stored.');
             }
-            @chmod($target, 0640);
+            @chmod($target, 0644);
         } catch (Throwable $exception) {
             if (is_file($target)) {
                 unlink($target);
@@ -87,13 +89,15 @@ final readonly class ProductImageStorage
         }
     }
 
-    private function convertToWebp(string $source, string $target, int $width, int $height): bool
+    private function convertToWebp(string $source, string $mimeType, string $target, int $width, int $height): bool
     {
         $contents = file_get_contents($source);
         if (!is_string($contents)) {
             return false;
         }
-        $image = imagecreatefromstring($contents);
+        $image = $mimeType === 'image/avif'
+            ? imagecreatefromavif($source)
+            : imagecreatefromstring($contents);
         if ($image === false) {
             return false;
         }

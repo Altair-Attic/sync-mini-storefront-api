@@ -272,10 +272,14 @@ final class CatalogueApiTest extends TestCase
         self::assertSame(422, $invalidCatRes->status);
         self::assertSame('INVALID_CATEGORY', $this->responseObject($invalidCatRes, 'error')['code'] ?? null);
 
-        // 8. Delete / deactivation
+        // 8. Delete a product without order history.
         $deleteRes = $this->dispatchProduct('DELETE', $authHeaders, ['id' => $productId]);
         self::assertSame(200, $deleteRes->status);
-        self::assertFalse($this->responseObject($deleteRes, 'data')['is_active']);
+        $deletedData = $this->responseObject($deleteRes, 'data');
+        self::assertSame('deleted', $deletedData['action']);
+        self::assertSame('Product permanently deleted.', $deletedData['message']);
+        self::assertNull($deletedData['product']);
+        self::assertNull((new ProductRepository($this->db))->find($productId));
 
         // Cleanup
         $this->db->prepare('DELETE FROM merchant_users WHERE id = :id')->execute(['id' => $adminId]);

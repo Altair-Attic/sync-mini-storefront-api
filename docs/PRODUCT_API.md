@@ -16,7 +16,7 @@ Products use PHP-generated UUID v4 internal and public identifiers. Prices are n
     "description": null,
     "price_kobo": 250000,
     "currency": "NGN",
-    "image_url": "/uploads/products/generated.webp",
+    "image_url": "https://store.example.com/uploads/products/generated.webp",
     "is_available": true,
     "display_order": 0,
     "category": null
@@ -45,13 +45,13 @@ POST and PUT are full representations. `category_id` is nullable and must identi
 
 `PATCH /api/v1/admin/products/{id}/availability` accepts `{"available": boolean}` or `{"is_available": boolean}` to mutate ordering availability quickly without submitting a complete representation.
 
-DELETE is repeatable deactivation and sets `is_active=false`; it never hard-deletes. Catalogue changes are independent of future immutable order-item snapshots.
+DELETE permanently removes a product when it has no order history. If an order item references it, DELETE archives it by setting `is_active=false` instead, preserving the immutable order snapshot. The response contains `action` (`deleted` or `archived`) and a clear `message`; archived responses also include the inactive product.
 
 ## Product images
 
-Uploads allow only JPEG, PNG, and WebP, determined from file contents using `finfo`; browser MIME types and filenames are ignored. Generated names contain 48 random hexadecimal characters. Oversized uploads return `413 UPLOAD_TOO_LARGE`; invalid media returns `415 UNSUPPORTED_MEDIA_TYPE`.
+Uploads allow JPEG, PNG, WebP, and AVIF, determined from file contents using `finfo`; browser MIME types and filenames are ignored. Generated names contain 48 random hexadecimal characters. Oversized uploads return `413 UPLOAD_TOO_LARGE`; invalid media returns `415 UNSUPPORTED_MEDIA_TYPE`.
 
-If GD with WebP is available, images are converted to WebP and oversized dimensions are reduced while preserving aspect ratio. Without that support, validated originals are stored securely; resizing has not occurred. Storage is outside application source, has a deny-execution `.htaccess`, and requires a server mapping from the public path. A new file is removed if the database update fails. A previous managed image is removed only after success; external HTTPS images are never automatically deleted.
+If GD with WebP is available, JPEG, PNG, WebP, and AVIF inputs with AVIF GD decoding support are converted to WebP and oversized dimensions are reduced while preserving aspect ratio. Otherwise, the validated original is stored securely. Storage is outside application source, has a deny-execution `.htaccess`, and requires a server mapping from the public path. A new file is removed if the database update fails. A previous managed image is removed only after success; external HTTPS images are never automatically deleted.
 
 Configuration:
 

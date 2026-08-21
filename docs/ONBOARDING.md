@@ -1,7 +1,13 @@
-# Onboarding
+# Merchant bootstrap
 
-Copy `resources/onboarding.example.json` to `storage/private/onboarding/onboarding.json`, edit it with non-secret business data, run migrations, then run `ONBOARDING_ADMIN_PASSWORD='temporary-strong-password' php bin/onboard.php --file=/absolute/path/onboarding.json`. Remove the temporary environment variable immediately. The file is ignored by Git and must remain outside `public/`.
+After migrations complete, initialize a fresh merchant database interactively:
 
-The command is transactional and idempotent: a matching re-run does not duplicate records or reset the password; conflicting business identity or administrator email stops safely. Production requires PHP 8.3, PDO MySQL, JSON, and writable `storage/logs`. Point cPanel’s document root at `public/`.
+```bash
+/opt/alt/php83/usr/bin/php scripts/bootstrap-merchant.php
+```
 
-Use a disposable MySQL database for migration and onboarding tests. Never reset an existing development or production database automatically. Existing installations that used the earlier numeric-ID development schema require a reviewed data migration; only disposable databases may be dropped and recreated for the UUID schema.
+The command asks for the business profile and, when no administrator exists, the first administrator. The password is entered twice with terminal echo disabled; it is never supplied as a command-line argument, stored in an onboarding file, or written to logs.
+
+The command is transactional. It creates only missing records: an existing administrator is preserved when the business profile is missing, and an existing profile is preserved when only the administrator is missing. When both already exist it exits successfully without making changes. It does not create demo products, categories, or orders.
+
+Run it from an interactive SSH terminal, after `scripts/migrate.php` and before opening the merchant administration UI. Production requires PHP 8.3, PDO MySQL, JSON, and writable `storage/logs`. Point cPanel's document root at `public/`.

@@ -23,6 +23,7 @@ final readonly class ProductService
         private CategoryRepository $categories,
         private ProductValidator $validator,
         private ProductListQueryValidator $queryValidator,
+        private string $appUrl = '',
     ) {
     }
 
@@ -35,7 +36,9 @@ final readonly class ProductService
         $validated = $this->queryValidator->publicQuery($query);
         $result = $this->products->publicList($validated);
 
-        return $this->page($result['items'], $validated['page'], $validated['per_page'], $result['total']);
+        $items = array_map(fn (array $product): array => $this->publicResponse($product), $result['items']);
+
+        return $this->page($items, $validated['page'], $validated['per_page'], $result['total']);
     }
 
     /** @return array<string, mixed> */
@@ -46,7 +49,7 @@ final readonly class ProductService
             throw new ProductNotFoundException();
         }
 
-        return $product;
+        return $this->publicResponse($product);
     }
 
     /**
@@ -135,6 +138,24 @@ final readonly class ProductService
         return $this->find($id);
     }
 
+    /** @return array{action: 'deleted'|'archived', message: string, product: array<string, mixed>|null} */
+    public function delete(string $id): array
+    {
+        $this->requireProduct($id);
+        if (!$this->products->isReferencedByOrder($id)) {
+            $this->products->delete($id);
+
+            return ['action' => 'deleted', 'message' => 'Product permanently deleted.', 'product' => null];
+        }
+        $this->products->deactivate($id);
+
+        return [
+            'action' => 'archived',
+            'message' => 'Product has existing orders and was archived instead to preserve order history.',
+            'product' => $this->find($id),
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function requireProduct(string $id): array
     {
@@ -188,7 +209,33 @@ final readonly class ProductService
             }
             $product[$field] = $date->format('Y-m-d\TH:i:s\Z');
         }
+        $product['image_url'] = $this->imageUrl($product['image_url'] ?? null);
 
         return $product;
+    }
+
+    /** @param array<string, mixed> $product
+     * @return array<string, mixed>
+     */
+    private function publicResponse(array $product): array
+    {
+        $product['image_url'] = $this->imageUrl($product['image_url'] ?? null);
+
+        return $product;
+    }
+
+    private function imageUrl(mixed $url): ?string
+    {
+        if ($url === null) {
+            return null;
+        }
+        if (!is_string($url)) {
+            throw new \RuntimeException('Invalid product image URL.');
+        }
+        if (!str_starts_with($url, '/') || $this->appUrl === '') {
+            return $url;
+        }
+
+        return rtrim($this->appUrl, '/') . $url;
     }
 }
